@@ -1,0 +1,98 @@
+# Ported from coalMatrixForMSPrime2by3.txt and migMatrixForMSPrime2by3.txt. All rates
+# were divided by 2000 (as implied by msprimeTest2by3.py).
+ploidy: 2
+coalescence:
+  vectors:
+  - [1, 2, 3, 4, 5, 6]
+  parameters:
+  - ground_truth: 0.003397462
+    lb: 1.0e-05
+    ub: 0.01
+    index: 1
+  - ground_truth: 0.002974771
+    lb: 1.0e-05
+    ub: 0.01
+    index: 2
+  - ground_truth: 0.0001687103
+    lb: 1.0e-05
+    ub: 0.01
+    index: 3
+  - ground_truth: 0.0028163274
+    lb: 1.0e-05
+    ub: 0.01
+    index: 4
+  - ground_truth: 0.0013332995
+    lb: 1.0e-05
+    ub: 0.01
+    index: 5
+  - ground_truth: 0.0021047509
+    lb: 1.0e-05
+    ub: 0.01
+    index: 6
+epochTimeSplit: null
+migration:
+  matrices:
+  - [ [ 0,  1,  0,  2,  0,  0],
+      [ 3,  0,  4,  0,  5,  0],
+      [ 0,  6,  0,  0,  0,  7],
+      [ 8,  0,  0,  0,  9,  0],
+      [ 0, 10,  0, 11,  0, 12],
+      [ 0,  0, 13,  0, 14,  0] ]
+  parameters:
+  - ground_truth: 0.0027764495
+    lb: 1.0e-05
+    ub: 0.01
+    index: 1
+  - ground_truth: 0.0035553315
+    lb: 1.0e-05
+    ub: 0.01
+    index: 2
+  - ground_truth: 0.0014899785
+    lb: 1.0e-05
+    ub: 0.01
+    index: 3
+  - ground_truth: 0.0025785965
+    lb: 1.0e-05
+    ub: 0.01
+    index: 4
+  - ground_truth: 0.0044700875
+    lb: 1.0e-05
+    ub: 0.01
+    index: 5
+  - ground_truth: 0.004486651
+    lb: 1.0e-05
+    ub: 0.01
+    index: 6
+  - ground_truth: 0.0006716475
+    lb: 1.0e-05
+    ub: 0.01
+    index: 7
+  - ground_truth: 0.001075852
+    lb: 1.0e-05
+    ub: 0.01
+    index: 8
+  - ground_truth: 0.00030476265000000004
+    lb: 1.0e-05
+    ub: 0.01
+    index: 9
+  - ground_truth: 0.0022320085
+    lb: 1.0e-05
+    ub: 0.01
+    index: 10
+  - ground_truth: 0.00019788724999999997
+    lb: 1.0e-05
+    ub: 0.01
+    index: 11
+  - ground_truth: 0.0023113245
+    lb: 1.0e-05
+    ub: 0.01
+    index: 12
+  - ground_truth: 0.0032632629999999998
+    lb: 1.0e-05
+    ub: 0.01
+    index: 13
+  - ground_truth: 0.001428512
+    lb: 1.0e-05
+    ub: 0.01
+    index: 14
+populationConversion: null

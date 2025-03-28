@@ -1,0 +1,12 @@
+testing*
+mrpast/mrp-solver
+mrpast/mrp-eval
+build/
+py_build/
+dist/
+.cache/
+__pycache__
+*egg-info/
+*.swp
+*.trees
+roundtrip.yaml

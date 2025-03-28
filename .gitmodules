@@ -1,0 +1,9 @@
+[submodule "third-party/nlopt"]
+	path = third-party/nlopt
+	url = https://github.com/stevengj/nlopt/
+[submodule "third-party/eigen"]
+	path = third-party/eigen
+	url = https://github.com/eigen-mirror/eigen
+[submodule "test/third-party/autodiff"]
+	path = test/third-party/autodiff
+	url = https://github.com/autodiff/autodiff/
