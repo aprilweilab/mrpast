@@ -1,0 +1,115 @@
+ploidy: 2
+coalescence:
+  vectors:
+  - [1, 2, 3, 4, 5, 6, 0]
+  - [0, 0, 0, 0, 0, 0, 7]
+  parameters:
+  - ground_truth: 6.446482873031109e-05
+    lb: 1.0e-05
+    ub: 0.01
+    index: 1
+  - ground_truth: 0.0008009314586890395
+    lb: 1.0e-05
+    ub: 0.01
+    index: 2
+  - ground_truth: 0.0008957316907765961
+    lb: 1.0e-05
+    ub: 0.01
+    index: 3
+  - ground_truth: 0.0006867308124017574
+    lb: 1.0e-05
+    ub: 0.01
+    index: 4
+  - ground_truth: 0.00010430672528550718
+    lb: 1.0e-05
+    ub: 0.01
+    index: 5
+  - ground_truth: 0.0016066220136394323
+    lb: 1.0e-05
+    ub: 0.01
+    index: 6
+  - ground_truth: 0.0002133016
+    lb: 1.0e-05
+    ub: 0.01
+    index: 7
+migration:
+  matrices:
+  - [ [0, 1, 0, 2, 0, 0, 0],
+      [3, 0, 4, 0, 5, 0, 0],
+      [0, 6, 0, 0, 0, 7, 0],
+      [9, 0, 0, 0, 8, 0, 0],
+      [0, 12, 0, 10, 0, 11, 0],
+      [0, 0, 14, 0, 13, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0] ]
+  - [ [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0] ]
+  parameters:
+  - ground_truth: 0.008358954553750823
+    lb: 1.0e-05
+    ub: 0.01
+    index: 1
+  - ground_truth: 0.003915762724032668
+    lb: 1.0e-05
+    ub: 0.01
+    index: 2
+  - ground_truth: 0.00991114687838984
+    lb: 1.0e-05
+    ub: 0.01
+    index: 3
+  - ground_truth: 0.0045634283676066765
+    lb: 1.0e-05
+    ub: 0.01
+    index: 4
+  - ground_truth: 0.006913916973521281
+    lb: 1.0e-05
+    ub: 0.01
+    index: 5
+  - ground_truth: 0.0004772000606606805
+    lb: 1.0e-05
+    ub: 0.01
+    index: 6
+  - ground_truth: 0.0007818530256436477
+    lb: 1.0e-05
+    ub: 0.01
+    index: 7
+  - ground_truth: 0.008073698909350214
+    lb: 1.0e-05
+    ub: 0.01
+    index: 8
+  - ground_truth: 0.009965563628554885
+    lb: 1.0e-05
+    ub: 0.01
+    index: 9
+  - ground_truth: 0.0048183416746066495
+    lb: 1.0e-05
+    ub: 0.01
+    index: 10
+  - ground_truth: 0.008350208435122169
+    lb: 1.0e-05
+    ub: 0.01
+    index: 11
+  - ground_truth: 0.0071613459422729545
+    lb: 1.0e-05
+    ub: 0.01
+    index: 12
+  - ground_truth: 9.206741445884357e-05
+    lb: 1.0e-05
+    ub: 0.01
+    index: 13
+  - ground_truth: 0.005250320005183591
+    lb: 1.0e-05
+    ub: 0.01
+    index: 14
+populationConversion:
+  # Epoch 1 -> Epoch 2, the population structure stays constant.
+  - [6, 6, 6, 6, 6, 6, 6]
+epochTimeSplit: 
+- ground_truth: 5.0e+03
+  lb: 1.0e+03
+  ub: 1.0e+04
+  index: 1

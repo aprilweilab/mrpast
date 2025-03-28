@@ -1,0 +1,127 @@
+# stdpopsim model OutOfAfrica_2T12+ExtendedNeanderthalAdmixture, OutOfAfrica_2T12 is according to which:
+# "Model parameters are taken from Fig. S5 in Fu et al. (2013)"
+# ExtendedNeanderthalAdmixture is added in based on OutOfAfricaExtendedNeandertalAdmixturePulse_3I21 from
+# paper Iasi et al. (2021) with some changes to increase the extended pulse a little bit.
+ploidy: 2
+pop_names:
+- AFR
+- EUR
+- NEAN # Additional Neanderthal deme
+coalescence:
+  vectors:
+  - [3, 6, 7]
+  - [2, 5, 7]
+  - [2, 4, 7]
+  - [2, 0, 7]
+  - [1, 0, 7]
+  - [1, 0, 0]
+  parameters:
+  - ground_truth: 6.839945280437756e-05
+    lb: 1e-07
+    ub: 0.01
+    index: 1
+  - ground_truth: 3.45447008428907e-05
+    lb: 1e-07
+    ub: 0.01
+    index: 2
+  - ground_truth: 1.1570737191765288e-06
+    lb: 1e-07
+    ub: 0.01
+    index: 3
+  - ground_truth: 0.00026867275658248256
+    lb: 1e-07
+    ub: 0.01
+    index: 4
+  - ground_truth: 5.388388380070718e-05
+    lb: 1e-07
+    ub: 0.01
+    index: 5
+  - ground_truth: 9.971355417745619e-07
+    lb: 1e-07
+    ub: 0.01
+    index: 6
+  - ground_truth: 5e-05 # Parameter 7; using the Ne = 10000 from OutOfAfricaExtendedNeandertalAdmixturePulse_3I21
+    lb: 1e-07
+    ub: 0.01
+    index: 7
+migration:
+  matrices:
+  - - [0, 2, 0]
+    - [2, 0, 0]
+    - [0, 0, 0]
+  - - [0, 2, 0]
+    - [2, 0, 0]
+    - [0, 0, 0]
+  - - [0, 1, 0] # This becomes the epoch with NEAN-> EUR
+    - [1, 0, 3]
+    - [0, 0, 0]
+  - - [0, 0, 0]
+    - [0, 0, 0]
+    - [0, 0, 0]
+  - - [0, 0, 0] # Add a new epoch to indicate the Human-Neanderthal split
+    - [0, 0, 0]
+    - [0, 0, 0]
+  - - [0, 0, 0]
+    - [0, 0, 0]
+    - [0, 0, 0]
+  parameters:
+  - ground_truth: 0.00015
+    lb: 1e-05
+    ub: 0.01
+    index: 1
+  - ground_truth: 2.5e-05
+    lb: 1e-05
+    ub: 0.01
+    index: 2
+  - ground_truth: 2.678e-5 # Add NEAN -> EUR migration, rate based on 0.03/1120 generations, a simplified extended pulse
+    lb: 1e-05
+    ub: 0.01
+    index: 3
+growth:
+  vectors:
+  - [1, 3, 0]
+  - [0, 2, 0]
+  - [0, 0, 0] # This become the epoch with NEAN-> EUR
+  - [0, 0, 0]
+  - [0, 0, 0]
+  - [0, 0, 0]
+  parameters:
+  - ground_truth: 0.0166
+    lb: 0.001
+    ub: 0.05
+    index: 1
+  - ground_truth: 0.0030700000000000002
+    lb: 0.001
+    ub: 0.05
+    index: 2
+  - ground_truth: 0.0195
+    lb: 0.001
+    ub: 0.05
+    index: 3
+epochTimeSplit: # Below are simplified to try to only increase the epoch time by 1.
+- ground_truth: 204.6
+  lb: 100.0
+  ub: 562.0
+  index: 1
+- ground_truth: 920.0 # Assume NEAN-> EUR continues till this time
+  lb: 562.0
+  ub: 1480.0
+  index: 2
+- ground_truth: 2040.0 # Assume NEAN-> EUR also happens at this time
+  lb: 1480.0
+  ub: 3980.0
+  index: 3
+- ground_truth: 5920.0
+  lb: 3980.0
+  ub: 7910.0
+  index: 4
+- ground_truth: 10000.0 # Human-Neanderthal split
+  lb: 9000.0
+  ub: 12000.0
+  index: 5
+populationConversion:
+- [0, 1, 2]
+- [0, 1, 2]
+- [0, 0, 2]
+- [0, 0, 2]
+- [0, 0, 0]
