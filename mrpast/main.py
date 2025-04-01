@@ -109,6 +109,7 @@ CMD_INIT = "init"
 CMD_CONFIDENCE = "confidence"
 CMD_POLARIZE = "polarize"
 CMD_SHOW = "show"
+CMD_SELECT = "select"
 
 
 class BootstrapOpt(Enum):
@@ -970,6 +971,21 @@ def main():
         "--sort-by", "-s", default="Index", help="Sort parameters by the column name."
     )
 
+    select_parser = subparsers.add_parser(CMD_SELECT, help="AIC-based model selection.")
+    select_parser.add_argument(
+        "solved_results",
+        nargs="+",
+        help="Two or more JSON file output by the solver.",
+    )
+    select_parser.add_argument(
+        "--bootstrap",
+        "-b",
+        action="store_true",
+        help="Emit the distribution of AIC values for all bootstrapped samples. Requires "
+        "that you have previously run 'mrpast confidence --bootstrap' to produce a .csv "
+        "for each of the solved_results.",
+    )
+
     args = parser.parse_args()
 
     if hasattr(args, "model"):
@@ -1151,6 +1167,18 @@ def main():
         print(f"Finished polarizing. Wrote {args.out_prefix}.vcf")
     elif args.command == CMD_SHOW:
         tab_show(args.solved_result, args.sort_by)
+    elif args.command == CMD_SELECT:
+        cmd = [eval_exe, "select"]
+        if args.bootstrap:
+            cmd.append("--bootstrap")
+        if len(args.solved_results) < 2:
+            print(
+                "You must pass at least two solver output JSON files as input",
+                file=sys.stderr,
+            )
+            exit(1)
+        result = subprocess.check_output(cmd + args.solved_results)
+        print(result)
     else:
         parser.print_help()
         exit(1)
