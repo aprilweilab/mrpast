@@ -111,7 +111,7 @@ setup(
         "Operating System :: POSIX :: Linux",
     ],
     package_data={
-        PACKAGE_NAME: [SOLVER_NAME],
+        PACKAGE_NAME: [SOLVER_NAME, EVAL_NAME],
     },
     include_package_data=True,
     entry_points={
