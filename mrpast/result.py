@@ -25,6 +25,7 @@ import pandas as pd
 try:
     import networkx as nx
     import matplotlib.pyplot as plt
+    import matplotlib as mpl
 except ImportError:
     nx = None  # type: ignore
     plt = None  # type: ignore
@@ -220,6 +221,10 @@ def draw_graphs(
     migrate_color: Optional[str] = None,
     popsize_color: Optional[str] = None,
     x_offset: float = 0.25,
+    coal_values: Optional[List[float]] = None,
+    mig_values: Optional[List[float]] = None,
+    cax=None,
+    cmap=plt.cm.RdYlBu,  # type: ignore
 ):
     """
     Draw the topology of the given input mrpast model file on the given matplotlib axis.
@@ -237,6 +242,10 @@ def draw_graphs(
     :param popsize_color: The color to use for deme nodes. By default, the
         matplotlib.pyplot.cm.Dark2 colormap is used.
     :param x_offset: The offset from the X-axis to start drawing.
+    :param coal_values: If non-None, use this list of coalescence rate values instead of the
+        ground-truth values from the model.
+    :param mig_values: If non-None, use this list of migration rate values instead of the
+        ground-truth values from the model.
     """
     assert (
         nx is not None and plt is not None
@@ -251,12 +260,27 @@ def draw_graphs(
     y_offset = 0.0
     pos: Optional[Dict[Any, Any]] = None
 
+    def get_coal_value(coal_param_idx):
+        if coal_values is not None:
+            return coal_values[coal_param_idx]
+        return model_config["coalescence"]["parameters"][coal_param_idx]["ground_truth"]
+
+    def get_mig_value(mig_param_idx):
+        if mig_values is not None:
+            return mig_values[mig_param_idx]
+        return model_config["migration"]["parameters"][mig_param_idx]["ground_truth"]
+
+    avg_mig = 0.0
+    for i in range(len(model_config["migration"]["parameters"])):
+        avg_mig += get_mig_value(i)
+    avg_mig /= len(model_config["migration"]["parameters"])
+
     max_popsize = 0
     for epoch in reversed(range(epochs)):
         for param_idx in model_config["coalescence"]["vectors"][epoch]:
             if param_idx > 0:
                 param = model_config["coalescence"]["parameters"][param_idx - 1]
-                pop_size = 1 / (ploidy * param["ground_truth"])
+                pop_size = 1 / (ploidy * get_coal_value(param_idx - 1))
                 if pop_size > max_popsize:
                     max_popsize = pop_size
 
@@ -271,7 +295,7 @@ def draw_graphs(
             param_idx = coal_vector[i]
             if param_idx > 0:
                 param = model_config["coalescence"]["parameters"][param_idx - 1]
-                pop_sizes[i] = 1 / (ploidy * param["ground_truth"])
+                pop_sizes[i] = 1 / (ploidy * get_coal_value(param_idx - 1))
         nodes = [i for i in range(num_demes) if pop_sizes[i] > 0]
         node_sizes.extend(
             [max(0, (pop_sizes[i] / max_popsize) * max_node_size) for i in nodes]
@@ -284,10 +308,11 @@ def draw_graphs(
                 param_idx = mig_matrix[i][j]
                 if param_idx > 0:
                     param = model_config["migration"]["parameters"][param_idx - 1]
+                    w = math.log10(get_mig_value(param_idx - 1) / avg_mig)
                     G.add_edge(
                         base_node_id + i,
                         base_node_id + j,
-                        weight=param["ground_truth"] * 5,
+                        weight=w,
                     )
 
         if grid_cols is not None:
@@ -307,9 +332,6 @@ def draw_graphs(
         base_node_id += num_demes
 
     weights = [G[u][v]["weight"] for u, v in G.edges()]
-    weights = [
-        math.log10(w) for w in weights
-    ]  # Log-scale the weights, to differentiate better
     if popsize_color is None:
         node_options = {
             "node_size": node_sizes,
@@ -330,7 +352,7 @@ def draw_graphs(
             "edge_vmin": min(weights)
             * 1.25,  # These are log scale, so this makes a smaller (more negative) value
             "edge_vmax": max(weights),
-            "edge_cmap": plt.cm.Oranges,  # type: ignore
+            "edge_cmap": cmap,
             "connectionstyle": "arc3,rad=0.1",
         }
     else:
@@ -343,7 +365,17 @@ def draw_graphs(
     print(f"Edge weights: {weights}")
     nx.draw_networkx_nodes(G, pos=pos, **node_options, ax=ax)
     nx.draw_networkx_edges(G, pos=pos, **edge_options, ax=ax)
-    _ = plt.axis("off")
+    ax.axis("off")
+
+    # Colorbar "legend"
+    norm_weights = mpl.colors.Normalize(vmin=min(weights), vmax=max(weights))
+    if cax is None:
+        cax = ax
+    plt.colorbar(
+        plt.cm.ScalarMappable(cmap=cmap, norm=norm_weights),
+        orientation="vertical",
+        cax=cax,
+    )
 
 
 def get_matching_colors(num_demes, demes=[]):
