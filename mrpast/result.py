@@ -224,7 +224,7 @@ def draw_graphs(
     coal_values: Optional[List[float]] = None,
     mig_values: Optional[List[float]] = None,
     cax=None,
-    cmap=plt.cm.RdYlBu,  # type: ignore
+    cmap=None,
 ):
     """
     Draw the topology of the given input mrpast model file on the given matplotlib axis.
@@ -250,6 +250,8 @@ def draw_graphs(
     assert (
         nx is not None and plt is not None
     ), "Plotting requires networkx and matplotlib; run 'pip install networkx matplotlib'"
+    if cmap is None:
+        cmap = plt.cm.RdYlBu  # type: ignore
     G = nx.DiGraph()
     model_config = mrpast.model.load_model_config(model_file)
     ploidy = model_config["ploidy"]

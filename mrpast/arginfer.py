@@ -774,9 +774,9 @@ def infer_arg(
     else:
         suffix = "vcf"
     # The VCF files and the recombination map files must match in sorted order!
-    vcf_files = list(
-        sorted(map(os.path.abspath, glob.glob(f"{vcf_glob_prefix}*.{suffix}")))
-    )
+    the_glob = f"{vcf_glob_prefix}*.{suffix}"
+    vcf_files = list(sorted(map(os.path.abspath, glob.glob(the_glob))))
+    assert len(vcf_files) > 0, f"Found no input files match glob {the_glob}"
 
     recomb_list: List[Union[float, str]] = []
     if isinstance(recomb, str):
@@ -792,7 +792,7 @@ def infer_arg(
         recomb_list = recomb_list * len(vcf_files)
     assert len(vcf_files) == len(
         recomb_list
-    ), "You must provide either a single recombination rate/map, or exactly one for each VCF/VCZ"
+    ), f"You must provide either a single recombination rate/map, or exactly one for each VCF/VCZ. Saw {len(vcf_files)} input files and {len(recomb_list)} map files."
     fasta_list: List[Optional[str]] = []
     if isinstance(fasta, str):
         # Matched by lexicographic ordering. I.e., chr1.fa matches to chr1.vcf via order of the name.
