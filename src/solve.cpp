@@ -40,19 +40,39 @@ constexpr double solverMinChange = 1e-12;
 // The solver terminates when there are more objective function evaluations than
 // this.
 constexpr int maxObjectiveExecs = 5000000;
+// The solver terminates when the minimum does not change for this many executions.
+constexpr int maxSameMinExecs = 2000;
 
 constexpr size_t SHOW_STATUS_EVERY = 10000;
+
+nlopt_opt* global_opt = nullptr;
 
 double nlopt_objective(unsigned n, const double* params, double* grad, void* my_func_data) {
     NegLogLikelihoodCostFunctor* functor = static_cast<NegLogLikelihoodCostFunctor*>(my_func_data);
     assert(n == functor->m_schema.totalParams());
     const double result = (*functor)(params);
-    functor->m_minValue = std::min<double>(result, functor->m_minValue);
+
+    // nlopt seems to get stuck sometimes, making no progress but the other threshold on value changes
+    // don't get invoked. This only seems to happen when there are numerical issues, but this is a
+    // workaround to terminate in that case.
+    if (result < functor->m_minValue) {
+        functor->m_minValue = result;
+        functor->m_callsAtMinValue = 0;
+    } else {
+        functor->m_callsAtMinValue++;
+        if (functor->m_callsAtMinValue >= maxSameMinExecs) {
+            std::cerr << "Forcing stop because min value has not changed in " << maxSameMinExecs << " executions"
+                      << std::endl;
+            nlopt_force_stop(*global_opt);
+        }
+    }
+    // Display some status.
     if (functor->m_numObjCalls == 1 || functor->m_numObjCalls % SHOW_STATUS_EVERY == 0) {
         std::cerr << "calls: " << functor->m_numObjCalls << ", f() = " << result
                   << ", min(f()) = " << functor->m_minValue << std::endl;
     }
     functor->m_numObjCalls++;
+
     // If the nlopt method requires a derivative then we use numeric
     // differentiation via the central difference method. Currently
     // derivative-free approaches perform better. If we need to use a
@@ -76,8 +96,6 @@ double nlopt_objective(unsigned n, const double* params, double* grad, void* my_
     }
     return result;
 }
-
-nlopt_opt* global_opt = nullptr;
 
 // Handles ctrl+c interrupts gracefully so we can get the currently-best output
 // parameters when we terminate a solver run early.

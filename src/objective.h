@@ -313,10 +313,12 @@ public:
     void resetSolveStats() {
         m_numObjCalls = 1;
         m_minValue = std::numeric_limits<double>::max();
+        m_callsAtMinValue = 0;
     }
 
     size_t m_numObjCalls;
     double m_minValue;
+    size_t m_callsAtMinValue;
 
 private:
     const bool m_maximization;
