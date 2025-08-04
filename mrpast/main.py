@@ -44,6 +44,7 @@ from mrpast.helpers import (
     relate_polarize,
     remove_ext,
     which,
+    load_old_mrpast,
 )
 from mrpast.simulate import (
     run_simulation,
@@ -57,11 +58,7 @@ from mrpast.arginfer import (
 )
 from mrpast.model import (
     UserModel,
-    load_model_config,
-    SymbolicMatrices,
-    SymbolicEpochs,
     ModelSolverInput,
-    validate_model,
     print_model_warnings,
 )
 from mrpast.simprocess import (
@@ -305,8 +302,7 @@ def get_coal_counts(
         and description is a string describing what the samples mean (ARG samples, boostrapped, etc.)
     """
     # Load the configuration and create the symbolic model from it.
-    config = load_model_config(model_file)
-    M_symbolic = SymbolicMatrices.from_config(config["migration"])
+    model = UserModel.from_file(model_file)
 
     description = None
     if bootstrap == BootstrapOpt.none:
@@ -322,7 +318,7 @@ def get_coal_counts(
         assert False, f"Unrecognized bootstrap option {bootstrap}"
 
     number_of_groups = len(grouped_filenames)
-    deme_pair_index0 = M_symbolic.get_pair_ordering(0)
+    deme_pair_index0 = model.get_pair_ordering()
     coal_matrices = []
     if number_of_groups > 1:
         print(f"Using {number_of_groups} ARG sample with sampling method {description}")
@@ -913,11 +909,17 @@ def main():
     create_parser = subparsers.add_parser(
         CMD_INIT, help="Create an initial model, to be edited by the user."
     )
-    create_parser.add_argument(
+    init_choices = create_parser.add_mutually_exclusive_group()
+    init_choices.add_argument(
         "--from-demes",
         "-d",
         type=str,
         help="Convert a Demes YAML file into a mrpast model.",
+    )
+    init_choices.add_argument(
+        "--from-old-mrpast",
+        type=str,
+        help="Convert an old matrix-based mrpast YAML file into a current mrpast model.",
     )
 
     confidence_parser = subparsers.add_parser(
@@ -976,12 +978,6 @@ def main():
     )
 
     args = parser.parse_args()
-
-    if hasattr(args, "model"):
-        if isinstance(args.model, str):
-            validate_model(args.model)
-        elif isinstance(args.model, list):
-            [validate_model(m) for m in args.model]
 
     if args.command == CMD_SIMULATE:
         total_trees = run_simulation(
@@ -1075,7 +1071,8 @@ def main():
             assert (
                 demes is not None
             ), 'Could not find demes module; try "pip install demes"'
-            demography, _ = build_demography(args.model)
+            model = UserModel.from_file(args.model)
+            demography, _ = build_demography(model)
             print(demography.debug())
             if args.to_demes:
                 demes_graph = demography.to_demes()
@@ -1090,6 +1087,9 @@ def main():
                 file=sys.stderr,
             )
             dump_model_yaml(convert_from_demes(args.from_demes), sys.stdout)
+        elif args.from_old_mrpast is not None:
+            model = load_old_mrpast(args.from_old_mrpast)
+            dump_model_yaml(model, sys.stdout)
         else:
             print(
                 'You must pass in additional options to the "init" command. See --help',

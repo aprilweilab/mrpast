@@ -1,123 +1,70 @@
-# OutOfAfrica_4J17 from stdpopsim, converted from the Demes model that was exported
-# from stdpopsim. From Jouganous et al. (2017).
 ploidy: 2
+pop_count: 4
 pop_names:
 - YRI
 - CEU
 - CHB
 - JPT
 coalescence:
-  vectors:
-  - [2, 4, 5, 6]
-  - [2, 4, 5, 0]
-  - [2, 3, 0, 0]
-  - [2, 0, 0, 0]
-  - [1, 0, 0, 0]
+  entries:
+  - {"epoch": 0, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": 1, "rate": {"param": 4}}
+  - {"epoch": 0, "deme": 2, "rate": {"param": 5}}
+  - {"epoch": 0, "deme": 3, "rate": {"param": 6}}
+  - {"epoch": 1, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 1, "deme": 1, "rate": {"param": 4}}
+  - {"epoch": 1, "deme": 2, "rate": {"param": 5}}
+  - {"epoch": 2, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 2, "deme": 1, "rate": {"param": 3}}
+  - {"epoch": 3, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 4, "deme": 0, "rate": {"param": 1}}
   parameters:
-  - ground_truth: 4.4275214734791464e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 1
-  - ground_truth: 2.107836937734497e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 2
-  - ground_truth: 0.00017661603673613564
-    lb: 1.0e-06
-    ub: 0.01
-    index: 3
-  - ground_truth: 1.5735650172615685e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 4
-  - ground_truth: 7.94216846330162e-06
-    lb: 1.0e-06
-    ub: 0.01
-    index: 5
-  - ground_truth: 2.091008632355808e-06
-    lb: 1.0e-06
-    ub: 0.01
-    index: 6
-migration:
-  matrices:
-  - - [0, 2, 3, 0]
-    - [2, 0, 4, 0]
-    - [3, 4, 0, 5]
-    - [0, 0, 5, 0]
-  - - [0, 2, 3, 0]
-    - [2, 0, 4, 0]
-    - [3, 4, 0, 0]
-    - [0, 0, 0, 0]
-  - - [0, 1, 0, 0]
-    - [1, 0, 0, 0]
-    - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-  - - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-  - - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-    - [0, 0, 0, 0]
-  parameters:
-  - ground_truth: 0.000168
-    lb: 1.0e-06
-    ub: 0.01
-    index: 1
-  - ground_truth: 1.14e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 2
-  - ground_truth: 5.6e-06
-    lb: 1.0e-06
-    ub: 0.01
-    index: 3
-  - ground_truth: 4.75e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 4
-  - ground_truth: 3.3e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 5
+  - {"ground_truth": 4.4275214734791464e-05, "lb": 1e-06, "ub": 0.01, "index": 1}
+  - {"ground_truth": 2.107836937734497e-05, "lb": 1e-06, "ub": 0.01, "index": 2}
+  - {"ground_truth": 0.00017661603673613564, "lb": 1e-06, "ub": 0.01, "index": 3}
+  - {"ground_truth": 1.5735650172615685e-05, "lb": 1e-06, "ub": 0.01, "index": 4}
+  - {"ground_truth": 7.94216846330162e-06, "lb": 1e-06, "ub": 0.01, "index": 5}
+  - {"ground_truth": 2.091008632355808e-06, "lb": 1e-06, "ub": 0.01, "index": 6}
 growth:
-  vectors:
-  - [0, 1, 2, 3]
-  - [0, 1, 2, 0]
-  - [0, 0, 0, 0]
-  - [0, 0, 0, 0]
-  - [0, 0, 0, 0]
+  entries:
+  - {"epoch": 0, "deme": 1, "rate": {"param": 1}}
+  - {"epoch": 0, "deme": 2, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": 3, "rate": {"param": 3}}
+  - {"epoch": 1, "deme": 1, "rate": {"param": 1}}
+  - {"epoch": 1, "deme": 2, "rate": {"param": 2}}
   parameters:
-  - ground_truth: 0.0016000000000000003
-    lb: 0.001
-    ub: 0.05
-    index: 1
-  - ground_truth: 0.0026
-    lb: 0.001
-    ub: 0.05
-    index: 2
-  - ground_truth: 0.0129
-    lb: 0.001
-    ub: 0.05
-    index: 3
+  - {"ground_truth": 0.0016000000000000003, "lb": 0.001, "ub": 0.05, "index": 1}
+  - {"ground_truth": 0.0026, "lb": 0.001, "ub": 0.05, "index": 2}
+  - {"ground_truth": 0.0129, "lb": 0.001, "ub": 0.05, "index": 3}
+migration:
+  entries:
+  - {"epoch": 0, "source": 0, "dest": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "source": 0, "dest": 2, "rate": {"param": 3}}
+  - {"epoch": 0, "source": 1, "dest": 0, "rate": {"param": 2}}
+  - {"epoch": 0, "source": 1, "dest": 2, "rate": {"param": 4}}
+  - {"epoch": 0, "source": 2, "dest": 0, "rate": {"param": 3}}
+  - {"epoch": 0, "source": 2, "dest": 1, "rate": {"param": 4}}
+  - {"epoch": 0, "source": 2, "dest": 3, "rate": {"param": 5}}
+  - {"epoch": 0, "source": 3, "dest": 2, "rate": {"param": 5}}
+  - {"epoch": 1, "source": 0, "dest": 1, "rate": {"param": 2}}
+  - {"epoch": 1, "source": 0, "dest": 2, "rate": {"param": 3}}
+  - {"epoch": 1, "source": 1, "dest": 0, "rate": {"param": 2}}
+  - {"epoch": 1, "source": 1, "dest": 2, "rate": {"param": 4}}
+  - {"epoch": 1, "source": 2, "dest": 0, "rate": {"param": 3}}
+  - {"epoch": 1, "source": 2, "dest": 1, "rate": {"param": 4}}
+  - {"epoch": 2, "source": 0, "dest": 1, "rate": {"param": 1}}
+  - {"epoch": 2, "source": 1, "dest": 0, "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 0.000168, "lb": 1e-06, "ub": 0.01, "index": 1}
+  - {"ground_truth": 1.14e-05, "lb": 1e-06, "ub": 0.01, "index": 2}
+  - {"ground_truth": 5.6e-06, "lb": 1e-06, "ub": 0.01, "index": 3}
+  - {"ground_truth": 4.75e-05, "lb": 1e-06, "ub": 0.01, "index": 4}
+  - {"ground_truth": 3.3e-05, "lb": 1e-06, "ub": 0.01, "index": 5}
 epochTimeSplit:
-- ground_truth: 310
-  lb: 100.0
-  ub: 948
-  index: 1
-- ground_truth: 1586
-  lb: 948
-  ub: 2844
-  index: 2
-- ground_truth: 4103
-  lb: 2844
-  ub: 8206
-  index: 3
-- ground_truth: 12310
-  lb: 8206
-  ub: 16413
-  index: 4
+- {"ground_truth": 310.0, "lb": 100.0, "ub": 948.0, "index": 1}
+- {"ground_truth": 1586.0, "lb": 948.0, "ub": 2844.0, "index": 2}
+- {"ground_truth": 4103.0, "lb": 2844.0, "ub": 8206.0, "index": 3}
+- {"ground_truth": 12310.0, "lb": 8206.0, "ub": 16413.0, "index": 4}
 populationConversion:
 - [0, 1, 2, 2]
 - [0, 1, 1, 1]

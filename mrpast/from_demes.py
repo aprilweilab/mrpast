@@ -16,6 +16,17 @@
 import math
 import copy
 from typing import Dict, Any, Optional
+from mrpast.model import (
+    UserModel,
+    DEFAULT_PLOIDY,
+    DemeDemeRates,
+    DemeRates,
+    DemeDemeEntry,
+    DemeRateEntry,
+    SymbolicEpochs,
+    FloatParameter,
+    ParamRef,
+)
 
 try:
     import demes
@@ -28,24 +39,16 @@ TIME_UNIT_GENS = "generations"
 def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     assert demes is not None, f"'demes' package not found; try 'pip install demes'"
 
-    output_model: Dict[str, Any] = {
-        "ploidy": 2,
-        "pop_names": [],
-        "coalescence": {
-            "vectors": [],
-            "parameters": [],
-        },
-        "migration": {
-            "matrices": [],
-            "parameters": [],
-        },
-        "growth": {
-            "vectors": [],
-            "parameters": [],
-        },
-        "epochTimeSplit": [],
-        "populationConversion": [],
-    }
+    output_model = UserModel(
+        ploidy=DEFAULT_PLOIDY,
+        pop_count=0,
+        pop_names=[],
+        migration=DemeDemeRates(entries=[], parameters=[]),
+        coalescence=DemeRates(entries=[], parameters=[]),
+        growth=DemeRates(entries=[], parameters=[]),
+        epochs=SymbolicEpochs([]),
+        pop_convert=[],
+    )
     name2deme = {}
 
     def make_matrix(N: int):
@@ -67,7 +70,7 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     # List of epochs, ordered by most recent time first.
     epoch_set = set()
     for i, d in enumerate(demes_model.demes):
-        output_model["pop_names"].append(d.name)
+        output_model.pop_names.append(d.name)
         name2deme[d.name] = i
         for e in d.epochs:
             epoch_set.add(e.start_time)
@@ -79,18 +82,13 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     num_epochs = len(epoch_delimiters)
     epochs_by_start = {e: i for i, e in enumerate(epoch_delimiters)}
     for _ in range(num_epochs - 1):
-        output_model["populationConversion"].append(list(range(len(demes_model.demes))))
-    coal_vects = output_model["coalescence"]["vectors"]
-    mig_mats = output_model["migration"]["matrices"]
-    growth_vects = output_model["growth"]["vectors"]
+        output_model.pop_convert.append(list(range(len(demes_model.demes))))
 
-    def add_param(area, gt_value, sub_field=True, lb=1e-5, ub=0.01):
-        if sub_field:
-            dest = output_model[area]["parameters"]
-        else:
-            dest = output_model[area]
-        index = len(dest) + 1
-        dest.append({"ground_truth": gt_value, "lb": lb, "ub": ub, "index": index})
+    def add_param(param_list, gt_value, lb=1e-5, ub=0.01):
+        index = len(param_list) + 1
+        param_list.append(
+            FloatParameter(ground_truth=gt_value, lb=lb, ub=ub, index=index)
+        )
         return index
 
     # When the same value is used across multiple epochs for the "same" parameter, we remember that and don't
@@ -98,11 +96,6 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     # migration: we will create a parameter for both directions even if the rate value is identicial.
     remembered_params: Dict[Any, Any] = {}
 
-    seen_growth = False
-    for _ in range(num_epochs):
-        coal_vects.append(make_vector(len(demes_model.demes)))
-        mig_mats.append(make_matrix(len(demes_model.demes)))
-        growth_vects.append(make_vector(len(demes_model.demes)))
     for d_idx, d in enumerate(demes_model.demes):
         last_epoch = 0
         for e in d.epochs:
@@ -114,37 +107,48 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
                 assert e_idx is not None
                 growth_rate = -math.log(e.start_size / e.end_size) / e.time_span
                 if growth_rate > 0.0:
-                    seen_growth = True
-                    if ("growth", growth_rate, d_idx) in remembered_params:
-                        growth_vects[e_idx][d_idx] = remembered_params[
-                            ("growth", growth_rate, d_idx)
-                        ]
-                    else:
-                        param_idx = add_param("growth", growth_rate)
-                        remembered_params[("growth", growth_rate, d_idx)] = param_idx
-                        growth_vects[e_idx][d_idx] = param_idx
+                    gkey = ("growth", growth_rate, d_idx)
+                    if gkey not in remembered_params:
+                        param_idx = add_param(
+                            output_model.growth.parameters, growth_rate
+                        )
+                        remembered_params[gkey] = param_idx
+                    param_idx = remembered_params[gkey]
+                    output_model.growth.entries.append(
+                        DemeRateEntry(
+                            epoch=e_idx, deme=d_idx, rate=ParamRef(param=param_idx)
+                        )
+                    )
+
                 coal_rate = 1 / (2 * e.end_size)
-                if ("coalescence", coal_rate, d_idx) in remembered_params:
-                    coal_vects[e_idx][d_idx] = remembered_params[
-                        ("coalescence", coal_rate, d_idx)
-                    ]
-                else:
-                    param_idx = add_param("coalescence", coal_rate)
-                    remembered_params[("coalescence", coal_rate, d_idx)] = param_idx
-                    coal_vects[e_idx][d_idx] = param_idx
+                ckey = ("coalescence", coal_rate, d_idx)
+                if ckey not in remembered_params:
+                    param_idx = add_param(
+                        output_model.coalescence.parameters, coal_rate
+                    )
+                    remembered_params[ckey] = param_idx
+                param_idx = remembered_params[ckey]
+                output_model.coalescence.entries.append(
+                    DemeRateEntry(
+                        epoch=e_idx, deme=d_idx, rate=ParamRef(param=param_idx)
+                    )
+                )
+
                 last_epoch = max(last_epoch, e_idx)
                 e_idx = (e_idx + 1) if (e_idx + 1) < len(epochs_by_start) else None
         if d.ancestors:
-            assert len(d.ancestors) == 1, "mrpast does not support admixture; only 1-to-1 population split"
+            assert (
+                len(d.ancestors) == 1
+            ), "mrpast does not support admixture; only 1-to-1 population split"
             # Set the population splits.
             for a in d.ancestors:
-                output_model["populationConversion"][last_epoch][d_idx] = name2deme[a]
+                output_model.pop_convert[last_epoch][d_idx] = name2deme[a]
         # Mark the population as dead in the relevant epochs.
         for e_idx in range(last_epoch + 1, num_epochs - 1):
-            output_model["populationConversion"][e_idx][d_idx] = float("NaN")
+            output_model.pop_convert[e_idx][d_idx] = float("NaN")
 
     prev_row = list(range(num_demes))
-    for row in output_model["populationConversion"]:
+    for row in output_model.pop_convert:
         for i in range(len(row)):
             if math.isnan(row[i]):
                 last_dest = prev_row[i]
@@ -158,17 +162,22 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         e_idx = epochs_by_start[m.end_time]
         while e_idx != e_end:
             assert e_idx is not None
-            # Our model reverses destination and source (backwards vs. forward in time)
             dest_idx = name2deme[m.dest]
             src_idx = name2deme[m.source]
-            if ("migration", m.rate, dest_idx, src_idx) in remembered_params:
-                mig_mats[e_idx][dest_idx][src_idx] = remembered_params[
-                    ("migration", m.rate, dest_idx, src_idx)
-                ]
-            else:
-                param_idx = add_param("migration", m.rate)
-                remembered_params[("migration", m.rate, dest_idx, src_idx)] = param_idx
-                mig_mats[e_idx][dest_idx][src_idx] = param_idx
+            mkey = ("migration", m.rate, dest_idx, src_idx)
+            if mkey not in remembered_params:
+                param_idx = add_param(output_model.migration.parameters, m.rate)
+                remembered_params[mkey] = param_idx
+            param_idx = remembered_params[mkey]
+            # Our model reverses destination and source (backwards vs. forward in time)
+            output_model.migration.entries.append(
+                DemeDemeEntry(
+                    epoch=e_idx,
+                    source=dest_idx,
+                    dest=src_idx,
+                    rate=ParamRef(param=param_idx),
+                )
+            )
             e_idx = (e_idx + 1) if (e_idx + 1) < len(epochs_by_start) else None
 
     next_lb = 100.0
@@ -181,10 +190,8 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
             epoch_times[i + 1] if (i + 1) < len(epoch_times) else timeval + next_lb
         )
         next_ub = (timeval + next_val) // 2
-        add_param("epochTimeSplit", timeval, sub_field=False, lb=next_lb, ub=next_ub)
+        add_param(output_model.epochs.epoch_times, timeval, lb=next_lb, ub=next_ub)
         next_lb = next_ub
 
-    if not seen_growth:
-        del output_model["growth"]
-
+    output_model.pop_count = len(output_model.pop_names)
     return output_model

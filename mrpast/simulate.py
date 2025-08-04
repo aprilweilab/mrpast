@@ -24,19 +24,13 @@ import os
 from mrpast.helpers import (
     load_ratemap,
 )
-from mrpast.model import (
-    UserModel,
-    load_model_config,
-    SymbolicMatrices,
-    SymbolicEpochs,
-)
+from mrpast.model import UserModel, ParamRef
 
 
-def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
+def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[int]]:
     """
     Create the msprime Demography object for the given mrpast model filename.
     """
-    user_model = UserModel.from_file(model)
 
     # ASSUMPTION: Epoch_0 (the most recent) lists all the populations. Any population can be "unused"
     # in any epoch. If Epoch_i "introduces" a new population (backwards in time) then that population
@@ -71,8 +65,10 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
         size = None
         for epoch in range(num_epochs):
             # ne = 1 / (lambda * ploidy)
-            rate_param = user_model.coalescence.get_parameter(user_model.coalescence.matrices[epoch][i])
-            if rate_param is not None:
+            rate_entry = user_model.coalescence.get_entry(epoch, i)
+            if rate_entry is not None:
+                assert isinstance(rate_entry.rate, ParamRef)
+                rate_param = user_model.coalescence.get_parameter(rate_entry.rate.param)
                 if epoch == 0:
                     initially_active = True
                     active_pops.append(i)
@@ -82,10 +78,11 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
             rate_param is not None
         ), "Every population must have at least one epoch with a coalescent rate"
         growth_rate = None
-        if user_model.growth is not None:
-            grate_param = user_model.growth.get_parameter(user_model.growth.matrices[epoch][i])
-            if grate_param is not None:
-                growth_rate = grate_param.ground_truth
+        grow_entry = user_model.growth.get_entry(epoch, i)
+        if grow_entry is not None:
+            assert isinstance(grow_entry.rate, ParamRef)
+            grate_param = user_model.growth.get_parameter(grow_entry.rate.param)
+            growth_rate = grate_param.ground_truth
         demography.add_population(
             initial_size=size,
             initially_active=initially_active,
@@ -100,7 +97,7 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
         source_epoch = dest_epoch - 1
         derived = defaultdict(list)
         for src_pop in range(num_pops):
-            dest_pop = user_model.popConvert[source_epoch][src_pop]
+            dest_pop = user_model.pop_convert[source_epoch][src_pop]
             if dest_pop != src_pop and src_pop not in dead_pops:
                 derived[dest_pop].append(src_pop)
                 dead_pops[src_pop] = dest_epoch
@@ -122,30 +119,32 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
 
             # Handle coalescence rate (effective population size) changes
             if epoch > 0:
-                crate_idx = user_model.coalescence.matrices[epoch][i]
-                prev_crate_idx = user_model.coalescence.matrices[epoch - 1][i]
-                prev_grate_param_idx = None
-                grate_param_idx = None
-                if user_model.growth is not None:
-                    grate_param_idx = user_model.growth.matrices[epoch][i]
-                    prev_grate_param_idx = user_model.growth.matrices[epoch - 1][i]
+                crate_entry = user_model.coalescence.get_entry(epoch, i)
+                prev_crate_entry = user_model.coalescence.get_entry(epoch - 1, i)
+                grate_entry = user_model.growth.get_entry(epoch, i)
+                prev_grate_entry = user_model.growth.get_entry(epoch - 1, i)
                 if (
-                    prev_crate_idx != crate_idx
-                    and prev_crate_idx != 0
-                    and crate_idx != 0
-                ) or (grate_param_idx != prev_grate_param_idx):
-                    crate_param = user_model.coalescence.get_parameter(crate_idx)
+                    prev_crate_entry != crate_entry
+                    and prev_crate_entry is not None
+                    and crate_entry is not None
+                ) or (grate_entry != prev_grate_entry):
+                    assert isinstance(crate_entry.rate, ParamRef)
+                    crate_param = user_model.coalescence.get_parameter(
+                        crate_entry.rate.param
+                    )
                     if crate_param is not None:
                         size = Ne_from_coal_rate(crate_param.ground_truth)
                     else:
                         size = 0
 
                     growth_rate = 0
-                    if user_model.growth is not None:
-                        grate_param = user_model.growth.get_parameter(grate_param_idx)
-                        if grate_param is not None:
-                            growth_rate = grate_param.ground_truth
-                            print(f"Changing growth rate to {growth_rate}")
+                    if grate_entry is not None:
+                        assert isinstance(grate_entry.rate, ParamRef)
+                        grate_param = user_model.growth.get_parameter(
+                            grate_entry.rate.param
+                        )
+                        growth_rate = grate_param.ground_truth
+                        print(f"Changing growth rate to {growth_rate}")
 
                     demography.add_population_parameters_change(
                         epoch_time,
@@ -155,27 +154,33 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
                     )
 
             # Handle migration with all other populations.
-            for j in range(num_pops):
-                mrate_idx = user_model.migration.matrices[epoch][i, j]
-                mrate_param = user_model.migration.get_parameter(mrate_idx)
-                prev_mrate_idx = None
+            for j in range(user_model.pop_count):
+                mrate_entry = user_model.migration.get_entry(epoch, i, j)
+                prev_mrate_entry = None
                 if epoch > 0:
-                    prev_mrate_idx = user_model.migration.matrices[epoch - 1][i, j]
+                    prev_mrate_entry = user_model.migration.get_entry(epoch - 1, i, j)
 
                 # "The entry of [migration rate matrix] is the expected number of migrants moving from population i
                 #    to population j per generation, divided by the size of population j."
                 if epoch == 0:
-                    if mrate_param is not None:
+                    if mrate_entry is not None:
+                        assert isinstance(mrate_entry.rate, ParamRef)
+                        mrate_param = user_model.migration.get_parameter(
+                            mrate_entry.rate.param
+                        )
                         demography.set_migration_rate(i, j, mrate_param.ground_truth)
                 else:
-                    assert prev_mrate_idx is not None
                     # We have a change in rate.
-                    if mrate_idx != prev_mrate_idx:
-                        if mrate_param is None:
+                    if mrate_entry != prev_mrate_entry:
+                        if mrate_entry is None:
                             demography.add_migration_rate_change(
                                 time=epoch_time, rate=0, source=i, dest=j
                             )
                         else:
+                            assert isinstance(mrate_entry.rate, ParamRef)
+                            mrate_param = user_model.migration.get_parameter(
+                                mrate_entry.rate.param
+                            )
                             demography.add_migration_rate_change(
                                 time=epoch_time,
                                 rate=mrate_param.ground_truth,
@@ -187,7 +192,7 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
 
 
 def _run_simulation(
-    model: str,
+    model_file: str,
     arg_prefix: str,
     seq_len: int,
     num_replicates: int,
@@ -198,25 +203,17 @@ def _run_simulation(
     seed: int = 42,
 ) -> int:
 
+    model = UserModel.from_file(model_file)
     demography, active_pops = build_demography(model)
-
-    config = load_model_config(model)
-    ploidy = config["ploidy"]
-    M_symbolic = SymbolicMatrices.from_config(config["migration"])
-    npops = [M_symbolic.num_demes(i) for i in range(M_symbolic.num_epochs)]
-    assert all(
-        map(lambda n: n == npops[0], npops)
-    ), "All matrices must have the same population size"
 
     table = [
         ["Sequence Length", seq_len],
         ["Recombination rate", recomb_rate],
         ["Samples/population", samples_per_pop],
-        ["Ploidy", ploidy],
-        ["Epochs", M_symbolic.num_epochs],
+        ["Ploidy", model.ploidy],
+        ["Epochs", model.num_epochs],
+        ["Populations", model.pop_count],
     ]
-    for i in range(len(npops)):
-        table.append([f"Population Count (E{i})", npops[i]])
     print("Preparing simulation with parameters:")
     print(tabulate(table, headers=["Parameter", "Value"]))
     print()

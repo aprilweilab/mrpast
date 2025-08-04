@@ -1,4 +1,4 @@
-from mrpast.model import validate_model, SymbolicMatrices, load_model_config
+from mrpast.model import UserModel, ParamRef
 from mrpast.simulate import build_demography
 from mrpast.from_demes import convert_from_demes
 from mrpast.helpers import dump_model_yaml
@@ -16,10 +16,12 @@ class ModelTests(unittest.TestCase):
     # This test round-trips one of our example models through the Demes to/from conversion
     # and then verifies that the resulting parameters are the same.
     def test_demes_integration(self):
-        validate_model(MODEL_5D1E)
-        demography, _ = build_demography(MODEL_5D1E)
+        in_model = UserModel.from_file(MODEL_5D1E)
+        demography, _ = build_demography(in_model)
         demes_model = demography.to_demes()
-        with tempfile.TemporaryDirectory() as tmpdirname:
+        # with tempfile.TemporaryDirectory() as tmpdirname:
+        if True:
+            tmpdirname = "/tmp"
             demes_file = os.path.join(tmpdirname, "testing.demes.yaml")
             demes.dump(demes_model, demes_file)
             roundtrip_model = convert_from_demes(demes_file)
@@ -27,42 +29,57 @@ class ModelTests(unittest.TestCase):
             rt_model_file = os.path.join(tmpdirname, "roundtrip.yaml")
             with open(rt_model_file, "w") as fout:
                 dump_model_yaml(roundtrip_model, fout)
-            validate_model(rt_model_file)
+            UserModel.from_file(rt_model_file)
 
-            config_orig = load_model_config(MODEL_5D1E)
-            coal_orig = SymbolicMatrices.from_config(
-                config_orig["coalescence"], is_vector=True
+            config_orig = UserModel.from_file(MODEL_5D1E)
+            config_copy = UserModel.from_file(rt_model_file)
+
+            self.assertEqual(
+                len(config_orig.coalescence.entries),
+                len(config_copy.coalescence.entries),
             )
-            mig_orig = SymbolicMatrices.from_config(config_orig["migration"])
-
-            config_copy = load_model_config(rt_model_file)
-            coal_copy = SymbolicMatrices.from_config(
-                config_copy["coalescence"], is_vector=True
-            )
-            mig_copy = SymbolicMatrices.from_config(config_copy["migration"])
-
-            for m_orig, m_copy in zip(coal_orig.matrices, coal_copy.matrices):
-                for idx_orig, idx_copy in zip(m_orig, m_copy):
-                    assert idx_orig != 0 or (idx_copy == idx_orig)
-                    if idx_orig == 0:
-                        continue
-                    orig = coal_orig.get_parameter(idx_orig)
-                    copy = coal_copy.get_parameter(idx_copy)
+            for e_orig, e_copy in zip(
+                sorted(
+                    config_orig.coalescence.entries, key=lambda e: (e.epoch, e.deme)
+                ),
+                sorted(
+                    config_copy.coalescence.entries, key=lambda e: (e.epoch, e.deme)
+                ),
+            ):
+                self.assertEqual(e_orig.epoch, e_copy.epoch)
+                self.assertEqual(e_orig.deme, e_copy.deme)
+                if isinstance(e_orig.rate, ParamRef):
+                    self.assertTrue(isinstance(e_copy.rate, ParamRef))
+                    orig = config_orig.coalescence.get_parameter(e_orig.rate.param)
+                    copy = config_copy.coalescence.get_parameter(e_copy.rate.param)
                     self.assertAlmostEqual(orig.ground_truth, copy.ground_truth, 6)
-                    self.assertAlmostEqual(orig.lower_bound, copy.lower_bound, 6)
-                    self.assertAlmostEqual(orig.upper_bound, copy.upper_bound, 6)
+                    self.assertAlmostEqual(orig.lb, copy.lb, 6)
+                    self.assertAlmostEqual(orig.ub, copy.ub, 6)
 
-            for m_orig, m_copy in zip(mig_orig.matrices, mig_copy.matrices):
-                for row_orig, row_copy in zip(m_orig, m_copy):
-                    for idx_orig, idx_copy in zip(row_orig, row_copy):
-                        assert idx_orig != 0 or (idx_copy == idx_orig)
-                        if idx_orig == 0:
-                            continue
-                        orig = mig_orig.get_parameter(idx_orig)
-                        copy = mig_copy.get_parameter(idx_copy)
-                        self.assertAlmostEqual(orig.ground_truth, copy.ground_truth, 6)
-                        self.assertAlmostEqual(orig.lower_bound, copy.lower_bound, 6)
-                        self.assertAlmostEqual(orig.upper_bound, copy.upper_bound, 6)
+                self.assertEqual(
+                    len(config_orig.migration.entries),
+                    len(config_copy.migration.entries),
+                )
+            for e_orig, e_copy in zip(
+                sorted(
+                    config_orig.migration.entries,
+                    key=lambda e: (e.epoch, e.source, e.dest),
+                ),
+                sorted(
+                    config_copy.migration.entries,
+                    key=lambda e: (e.epoch, e.source, e.dest),
+                ),
+            ):
+                self.assertEqual(e_orig.epoch, e_copy.epoch)
+                self.assertEqual(e_orig.source, e_copy.source)
+                self.assertEqual(e_orig.dest, e_copy.dest)
+                if isinstance(e_orig.rate, ParamRef):
+                    self.assertTrue(isinstance(e_copy.rate, ParamRef))
+                    orig = config_orig.migration.get_parameter(e_orig.rate.param)
+                    copy = config_copy.migration.get_parameter(e_copy.rate.param)
+                    self.assertAlmostEqual(orig.ground_truth, copy.ground_truth, 6)
+                    self.assertAlmostEqual(orig.lb, copy.lb, 6)
+                    self.assertAlmostEqual(orig.ub, copy.ub, 6)
 
 
 if __name__ == "__main__":
