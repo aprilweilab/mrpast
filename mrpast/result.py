@@ -239,6 +239,52 @@ def load_json_pandas(
         if "one_minus" in p:
             del p["one_minus"]
         result.append(p)
+    for ptcount, p in enumerate(data["pulse_times"]):
+        v = _clamp(p, p["final"])
+        del p["apply_to"]
+        if "one_minus" in p:
+            del p["one_minus"]
+        is_fixed = _param_is_fixed(p)
+        if (is_fixed and skip_fixed) or _param_is_synthetic(p):
+            continue
+        p.update(
+            {
+                "label": f"PT{ptcount}",
+                "Ground Truth": (
+                    _clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                ),
+                "err_low": v - _clamp(p, get_interval(p, 0)),
+                "err_hi": _clamp(p, get_interval(p, 1)) - v,
+                "Optimized Value": v,
+                "Parameter Type": "Pulse time",
+                "Epochs": [],  # TODO
+                "Fixed": is_fixed,
+            }
+        )
+        result.append(p)
+    for ppcount, p in enumerate(data["pulse_parameters"]):
+        v = _clamp(p, p["final"])
+        del p["apply_to"]
+        if "one_minus" in p:
+            del p["one_minus"]
+        is_fixed = _param_is_fixed(p)
+        if (is_fixed and skip_fixed) or _param_is_synthetic(p):
+            continue
+        p.update(
+            {
+                "label": f"PP{ptcount}",
+                "Ground Truth": (
+                    _clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                ),
+                "err_low": v - _clamp(p, get_interval(p, 0)),
+                "err_hi": _clamp(p, get_interval(p, 1)) - v,
+                "Optimized Value": v,
+                "Parameter Type": "Pulse proportion",
+                "Epochs": [],  # TODO
+                "Fixed": is_fixed,
+            }
+        )
+        result.append(p)
 
     return pd.DataFrame.from_dict(result)
 
@@ -544,6 +590,8 @@ def tab_show(
         "epoch_times_gen",
         "smatrix_values_ne__gen",
         "amatrix_parameters",
+        "pulse_times",
+        "pulse_parameters",
     )
 
     ploidy = output["ploidy"]

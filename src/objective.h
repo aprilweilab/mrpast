@@ -126,6 +126,14 @@ inline bool isJsonParamSolverParam(const json& parameter) {
     return !isJsonParamFixed(parameter) && !isJsonParamOneMinus(parameter);
 }
 
+struct PulseApplication {
+    double coeff;
+    size_t i;
+    size_t j;
+    size_t pulse_index;
+    std::vector<size_t> variable_indices;
+};
+
 /**
  * The schema describes the parameters, their bounds, and how they apply to the
  * transition matrix of the Markov model.
@@ -228,6 +236,8 @@ public:
 
     std::vector<double> getEpochStartTimes(double const* parameters) const;
 
+    std::vector<double> getPulseTimes(double const* parameters) const;
+
     template <typename T> void addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data);
 
     json toJsonOutput(const double* parameters, double negLL) const;
@@ -239,6 +249,9 @@ public:
     size_t paramStartEpochs() const { return 0; }
     size_t paramStartSMatrix() const { return paramStartEpochs() + m_eParamIdx.size(); }
     size_t paramStartAdmix() const { return paramStartSMatrix() + m_sParamIdx.size(); }
+
+    size_t paramStartPulseTimes() const { return paramStartAdmix() + m_aParamIdx.size(); }
+    size_t paramStartPulseProp() const { return paramStartPulseTimes() + m_ptParamIdx.size(); }
 
     // Parameters and fixed values for epoch times
     VarList m_eParams;
@@ -254,6 +267,17 @@ public:
     std::vector<size_t> m_aFixedIdx;
     std::vector<size_t> m_aOneMinusIdx;
     std::vector<AdmixtureApplication> m_admixtureApps;
+
+    // Pulse time parameters.
+    VarList m_ptParams;
+    std::vector<size_t> m_ptParamIdx;
+    std::vector<size_t> m_ptFixedIdx;
+    // Pulse proportion parameters
+    VarList m_ppParams;
+    std::vector<size_t> m_ppParamIdx;
+    std::vector<size_t> m_ppFixedIdx;
+    std::vector<size_t> m_ppOneMinusIdx;
+    std::vector<PulseApplication> m_pulseApps;
 
 private:
     void initParamsViaList(double* parameters,
@@ -289,6 +313,7 @@ private:
 template <typename T>
 void ParameterSchema::addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data) {
     RELEASE_ASSERT(data.size() == totalParams());
+    RELEASE_ASSERT(false); // FIXME - handle pulse parameters
     size_t p = 0;
     json& epochTimes = outputData[EPOCH_TIMES_KEY];
     for (const size_t i : m_eParamIdx) {

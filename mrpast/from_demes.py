@@ -25,6 +25,7 @@ from mrpast.model import (
     DemeRates,
     FloatParameter,
     ParamRef,
+    PulseGroup,
     SymbolicEpochs,
     UserModel,
 )
@@ -49,6 +50,7 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         growth=DemeRates(entries=[], parameters=[]),
         epochs=SymbolicEpochs([]),
         admixture=AdmixtureGroup([], []),
+        pulse=PulseGroup([], []),
     )
     name2deme = {}
 
@@ -168,7 +170,7 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
             )
             e_idx = (e_idx + 1) if (e_idx + 1) < len(epochs_by_start) else None
 
-    # Pulse events
+    # FIXME: support converting Demes pulse events to mrpast pulse events
     assert (
         not demes_model.pulses
     ), "Admixture pulses are not supported in MrPast models yet."
