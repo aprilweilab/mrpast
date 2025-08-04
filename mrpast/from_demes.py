@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 import math
-import copy
 from typing import Dict, Any, Optional
 from mrpast.model import (
     UserModel,
@@ -51,12 +50,6 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     )
     name2deme = {}
 
-    def make_matrix(N: int):
-        return [copy.copy([0 for _ in range(N)]) for _ in range(N)]
-
-    def make_vector(N: int):
-        return copy.copy([0 for _ in range(N)])
-
     with open(demes_file) as f:
         demes_model = demes.load(f)
     assert (
@@ -86,6 +79,10 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
 
     def add_param(param_list, gt_value, lb=1e-5, ub=0.01):
         index = len(param_list) + 1
+        if lb >= gt_value:
+            lb = gt_value / 2
+        if ub <= gt_value:
+            ub = gt_value * 2
         param_list.append(
             FloatParameter(ground_truth=gt_value, lb=lb, ub=ub, index=index)
         )
@@ -116,7 +113,7 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
                     param_idx = remembered_params[gkey]
                     output_model.growth.entries.append(
                         DemeRateEntry(
-                            epoch=e_idx, deme=d_idx, rate=ParamRef(param=param_idx)
+                            epoch=e_idx, deme=d.name, rate=ParamRef(param=param_idx)
                         )
                     )
 
@@ -130,7 +127,7 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
                 param_idx = remembered_params[ckey]
                 output_model.coalescence.entries.append(
                     DemeRateEntry(
-                        epoch=e_idx, deme=d_idx, rate=ParamRef(param=param_idx)
+                        epoch=e_idx, deme=d.name, rate=ParamRef(param=param_idx)
                     )
                 )
 
@@ -173,8 +170,8 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
             output_model.migration.entries.append(
                 DemeDemeEntry(
                     epoch=e_idx,
-                    source=dest_idx,
-                    dest=src_idx,
+                    source=m.dest,
+                    dest=m.source,
                     rate=ParamRef(param=param_idx),
                 )
             )
@@ -193,5 +190,6 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         add_param(output_model.epochs.epoch_times, timeval, lb=next_lb, ub=next_ub)
         next_lb = next_ub
 
+    output_model.resolve_names()
     output_model.pop_count = len(output_model.pop_names)
     return output_model

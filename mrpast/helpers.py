@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Optional, List, Union, Tuple
+from copy import deepcopy
 from yaml import load, dump
 import json
 import os
@@ -104,6 +105,8 @@ def dump_model_yaml(model: UserModel, out):
     This is specific to how we want the models layed out for readability, but
     falls back to a YAML dumper otherwise.
     """
+    model = deepcopy(model)
+    model.unresolve_names()
 
     def dump_parameters(parameters: List[FloatParameter], indent=2, no_label=False):
         prefix = " " * indent

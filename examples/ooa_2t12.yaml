@@ -5,14 +5,14 @@ pop_names:
 - EUR
 coalescence:
   entries:
-  - {"epoch": 0, "deme": 0, "rate": {"param": 3}}
-  - {"epoch": 0, "deme": 1, "rate": {"param": 6}}
-  - {"epoch": 1, "deme": 0, "rate": {"param": 2}}
-  - {"epoch": 1, "deme": 1, "rate": {"param": 5}}
-  - {"epoch": 2, "deme": 0, "rate": {"param": 2}}
-  - {"epoch": 2, "deme": 1, "rate": {"param": 4}}
-  - {"epoch": 3, "deme": 0, "rate": {"param": 2}}
-  - {"epoch": 4, "deme": 0, "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 3}}
+  - {"epoch": 0, "deme": "EUR", "rate": {"param": 6}}
+  - {"epoch": 1, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "EUR", "rate": {"param": 5}}
+  - {"epoch": 2, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "deme": "EUR", "rate": {"param": 4}}
+  - {"epoch": 3, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 4, "deme": "AFR", "rate": {"param": 1}}
   parameters:
   - {"ground_truth": 6.839945280437756e-05, "lb": 1e-07, "ub": 0.01, "index": 1}
   - {"ground_truth": 3.45447008428907e-05, "lb": 1e-07, "ub": 0.01, "index": 2}
@@ -22,21 +22,21 @@ coalescence:
   - {"ground_truth": 9.971355417745619e-07, "lb": 1e-07, "ub": 0.01, "index": 6}
 growth:
   entries:
-  - {"epoch": 0, "deme": 0, "rate": {"param": 1}}
-  - {"epoch": 0, "deme": 1, "rate": {"param": 3}}
-  - {"epoch": 1, "deme": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "EUR", "rate": {"param": 3}}
+  - {"epoch": 1, "deme": "EUR", "rate": {"param": 2}}
   parameters:
   - {"ground_truth": 0.0166, "lb": 0.001, "ub": 0.05, "index": 1}
   - {"ground_truth": 0.0030700000000000002, "lb": 0.001, "ub": 0.05, "index": 2}
   - {"ground_truth": 0.0195, "lb": 0.001, "ub": 0.05, "index": 3}
 migration:
   entries:
-  - {"epoch": 0, "source": 0, "dest": 1, "rate": {"param": 2}}
-  - {"epoch": 0, "source": 1, "dest": 0, "rate": {"param": 2}}
-  - {"epoch": 1, "source": 0, "dest": 1, "rate": {"param": 2}}
-  - {"epoch": 1, "source": 1, "dest": 0, "rate": {"param": 2}}
-  - {"epoch": 2, "source": 0, "dest": 1, "rate": {"param": 1}}
-  - {"epoch": 2, "source": 1, "dest": 0, "rate": {"param": 1}}
+  - {"epoch": 0, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 0, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "source": "AFR", "dest": "EUR", "rate": {"param": 1}}
+  - {"epoch": 2, "source": "EUR", "dest": "AFR", "rate": {"param": 1}}
   parameters:
   - {"ground_truth": 0.00015, "lb": 1e-05, "ub": 0.01, "index": 1}
   - {"ground_truth": 2.5e-05, "lb": 1e-05, "ub": 0.01, "index": 2}

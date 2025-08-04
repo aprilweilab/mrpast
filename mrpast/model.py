@@ -114,6 +114,12 @@ class DemeDemeEntry(ResolveableEntry):
         if isinstance(self.dest, str):
             self.dest = resolve_name(self.dest, name2index)
 
+    def unresolve_names(self, names: List[str]):
+        if isinstance(self.source, int):
+            self.source = names[self.source]
+        if isinstance(self.dest, int):
+            self.dest = names[self.dest]
+
 
 @dataclass_json
 @dataclass
@@ -126,13 +132,15 @@ class DemeRateEntry(ResolveableEntry):
         if isinstance(self.deme, str):
             self.deme = resolve_name(self.deme, name2index)
 
+    def unresolve_names(self, names: List[str]):
+        if isinstance(self.deme, int):
+            self.deme = names[self.deme]
+
 
 @dataclass
 class ParamContainer:
-    def get_parameter(self, param_idx: Optional[int]) -> Optional[FloatParameter]:
+    def get_parameter(self, param_idx: int) -> Optional[FloatParameter]:
         assert hasattr(self, "parameters")
-        if param_idx == 0 or param_idx is None:
-            return None
         assert param_idx > 0
         for p in self.parameters:
             if p.index == param_idx:
@@ -142,6 +150,10 @@ class ParamContainer:
     def resolve_names(self, name2index: Dict[str, int]):
         assert hasattr(self, "entries")
         [e.resolve_names(name2index) for e in self.entries]
+
+    def unresolve_names(self, names: List[str]):
+        assert hasattr(self, "entries")
+        [e.unresolve_names(names) for e in self.entries]
 
     @staticmethod
     def _from_config(config_entry: Dict[str, Any], entry_type, base_type):
@@ -258,32 +270,7 @@ class UserModel:
         ploidy = int(config.get("ploidy", DEFAULT_PLOIDY))
         pop_convert = config.get("populationConversion", []) or []
 
-        # Validation
-        nepoch = epochs.num_epochs
-        assert ploidy >= 1 and ploidy <= 8, f"Unexpected ploidy value of {ploidy}"
-        assert (
-            nepoch == len(pop_convert) + 1
-        ), "For k epochs, there must be k-1 populationConversion lists"
-        assert (
-            mig.max_deme < pop_count
-        ), f"Migration entries reference a deme {mig.max_deme} that exceeds number of populations {pop_count}"
-        assert (
-            mig.max_epoch < nepoch
-        ), f"Migration entries reference an epoch {mig.max_epoch} that exceeds number of populations {nepoch}"
-        assert (
-            coal.max_deme < pop_count
-        ), f"Coalescence entries reference a deme {coal.max_deme} that exceeds number of populations {pop_count}"
-        assert (
-            coal.max_epoch < nepoch
-        ), f"Coalescence entries reference an epoch {coal.max_epoch} that exceeds number of populations {nepoch}"
-        assert (
-            grow.max_deme < pop_count
-        ), f"Growth entries reference a deme {grow.max_deme} that exceeds number of populations {pop_count}"
-        assert (
-            grow.max_epoch < nepoch
-        ), f"Growth entries reference an epoch {grow.max_epoch} that exceeds number of populations {nepoch}"
-
-        return UserModel(
+        result = UserModel(
             ploidy=ploidy,
             pop_count=pop_count,
             pop_names=pop_names,
@@ -293,6 +280,47 @@ class UserModel:
             growth=grow,
             pop_convert=pop_convert,
         )
+        result.resolve_names()
+
+        # Validation
+        nepoch = result.epochs.num_epochs
+        assert (
+            result.ploidy >= 1 and result.ploidy <= 8
+        ), f"Unexpected ploidy value of {result.ploidy}"
+        assert (
+            nepoch == len(result.pop_convert) + 1
+        ), "For k epochs, there must be k-1 populationConversion lists"
+        assert (
+            result.migration.max_deme < result.pop_count
+        ), f"Migration entries reference a deme {result.migration.max_deme} that exceeds number of populations {pop_count}"
+        assert (
+            result.migration.max_epoch < nepoch
+        ), f"Migration entries reference an epoch {result.migration.max_epoch} that exceeds number of populations {nepoch}"
+        assert (
+            result.coalescence.max_deme < pop_count
+        ), f"Coalescence entries reference a deme {result.coalescence.max_deme} that exceeds number of populations {pop_count}"
+        assert (
+            result.coalescence.max_epoch < nepoch
+        ), f"Coalescence entries reference an epoch {result.coalescence.max_epoch} that exceeds number of populations {nepoch}"
+        assert (
+            result.growth.max_deme < pop_count
+        ), f"Growth entries reference a deme {result.growth.max_deme} that exceeds number of populations {pop_count}"
+        assert (
+            result.growth.max_epoch < nepoch
+        ), f"Growth entries reference an epoch {result.growth.max_epoch} that exceeds number of populations {nepoch}"
+
+        return result
+
+    def resolve_names(self):
+        name2index = {k: v for v, k in enumerate(self.pop_names)}
+        self.migration.resolve_names(name2index)
+        self.coalescence.resolve_names(name2index)
+        self.growth.resolve_names(name2index)
+
+    def unresolve_names(self):
+        self.migration.unresolve_names(self.pop_names)
+        self.coalescence.unresolve_names(self.pop_names)
+        self.growth.unresolve_names(self.pop_names)
 
     @property
     def num_epochs(self) -> int:
