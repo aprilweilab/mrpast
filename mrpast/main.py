@@ -56,6 +56,7 @@ from mrpast.arginfer import (
     DEFAULT_NUM_SAMPLES as DEFAULT_ARG_SAMPLES,
 )
 from mrpast.model import (
+    UserModel,
     load_model_config,
     SymbolicMatrices,
     SymbolicEpochs,
@@ -378,24 +379,12 @@ def generate_solver_input(
     sampling_hashes: Optional[List[str]] = None,
     generate_ground_truth: bool = False,
 ) -> Tuple[List[str], List[str]]:
+    # TODO: cleanup all this nasty, there should be an outer-most UserModel object.
+
     # Load the configuration and create the symbolic model from it.
-    config = load_model_config(model_file)
-    M_symbolic = SymbolicMatrices.from_config(config["migration"])
-    q_symbolic = SymbolicMatrices.from_config(config["coalescence"], is_vector=True)
-    if "growth" in config:
-        g_symbolic = SymbolicMatrices.from_config(config["growth"], is_vector=True)
-    else:
-        g_symbolic = None
-    epochs_symbolic = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
-    solver_input = ModelSolverInput.construct(
-        M_symbolic,
-        q_symbolic,
-        g_symbolic,
-        epochs_symbolic,
-        config["populationConversion"],
-        init_from_ground_truth=generate_ground_truth,
-        pop_names=config.get("pop_names"),
-        ploidy=int(config.get("ploidy", 2)),
+    user_model = UserModel.from_file(model_file)
+    solver_input = user_model.to_solver_model(
+        generate_ground_truth=generate_ground_truth
     )
     # Add the coalescence and time discretization information to the solver input.
     solver_input.coal_count_matrices = coal_count_matrices
@@ -413,7 +402,7 @@ def generate_solver_input(
         solver_in_ids.append("truth")
 
     if replicates is None:
-        replicates = DEFAULT_SOLVE_REPS_PER_EPOCH * M_symbolic.num_epochs
+        replicates = DEFAULT_SOLVE_REPS_PER_EPOCH * user_model.num_epochs
     assert replicates is not None
     for i in range(replicates):
         repl_input = solver_input.randomize()

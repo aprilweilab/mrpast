@@ -20,7 +20,7 @@ try:
 except ImportError:
     from yaml import Loader, Dumper  # type: ignore
 from yaml import load, dump
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional, Union
 from numpy.typing import NDArray
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json
@@ -47,6 +47,7 @@ class ParameterKind(str, Enum):
     PARAM_KIND_MIGRATION = "migration"
     PARAM_KIND_COAL = "coalescence"
     PARAM_KIND_GROWTH = "growth"
+    PARAM_KIND_ADMIXTURE = "admixture"
 
 
 class TimeSliceAdjustment(str, Enum):
@@ -104,11 +105,11 @@ class SymbolicMatrices:
 
     def assert_square(self, name: str):
         for m in self.matrices:
-            assert m.shape[0] == m.shape[1], f"Matrix {name} must be square"
+            assert m.shape[0] == m.shape[1], f"Matrices in {name} must be square"
 
     def assert_vector(self, name: str):
         for m in self.matrices:
-            assert len(m.shape) == 1, f"{name} must be vectors (not matrices)"
+            assert len(m.shape) == 1, f"{name} must be a list of vectors (not matrices)"
 
     def get_parameter(self, param_idx: Optional[int]) -> Optional[FloatParameter]:
         if param_idx == 0 or param_idx is None:
@@ -170,11 +171,143 @@ class SymbolicMatrices:
 
         return SymbolicMatrices(parameters=parameters, matrices=matrices)
 
+def resolve_name(name: str, name2index: Dict[str, int]) -> int:
+    if name not in name2index:
+        raise RuntimeError(f"Unknown deme name: {name}")
+    return name2index[name]
 
-# The objective function takes as input values for parameters P_0...P_L and returns the negative log likelihood. The parameters have to be mapped
-# into the square stochastic matrix (concretely) based on a mapping from symbolic->concrete. This mapping is _fixed_ at configuration time, we can
-# compute it once and then just reuse it.
 
+@dataclass_json
+@dataclass
+class ParamRef:
+    param: int
+
+@dataclass_json
+@dataclass
+class AdmixtureEntry:
+    after_epoch: int
+    ancestral: Union[int, str]
+    derived: Union[int, str]
+    proportion: Union[float, ParamRef]
+ 
+    def resolve_names(self, name2index: Dict[str, int]):
+        if isinstance(self.ancestral, str):
+            self.ancestral = resolve_name(self.ancestral, name2index)
+        if isinstance(self.derived, str):
+            self.derived = resolve_name(self.derived, name2index)
+ 
+@dataclass
+class AdmixtureGroup:
+    entries: List[AdmixtureEntry]
+    parameters: List[FloatParameter]
+
+    # Oldest epoch number referenced.
+    @property
+    def max_epoch(self):
+        max_e = 0
+        for entry in self.entries:
+            max_e = max(max_e, entry.after_epoch)
+        return max_e
+
+    # Largest deme number referenced.
+    @property
+    def max_deme(self):
+        max_d = 0
+        for entry in self.entries:
+            max_d = max(max_d, entry.ancestral, entry.derived)
+        return max_d
+
+    def get_parameter(self, param_idx: Optional[int]) -> Optional[FloatParameter]:
+        if param_idx == 0 or param_idx is None:
+            return None
+        assert param_idx > 0
+        for p in self.parameters:
+            if p.index == param_idx:
+                return p
+        return None
+
+    def resolve_names(self, name2index: Dict[str, int]):
+        [e.resolve_names(name2index) for e in self.entries]
+
+    @staticmethod
+    def from_config(config_entry: Dict[str, Any]) -> "AdmixtureGroup":
+        parameters = []
+        for p in config_entry.get("parameters", []):
+            parameters.append(FloatParameter.from_config(p))
+        assert len(parameters) == len(
+            set(map(lambda p: p.index, parameters))
+        ), "Duplicate parameter index"
+        entries = []
+        for entry in config_entry.get("entries", []):
+            entries.append(AdmixtureEntry.from_dict(entry))
+        return AdmixtureGroup(entries=entries, parameters=parameters)
+
+@dataclass
+class UserModel:
+    ploidy: int
+    pop_count: int
+    pop_names: List[str]
+    migration: SymbolicMatrices
+    coalescence: SymbolicMatrices
+    epochs: SymbolicEpochs
+    growth: Optional[SymbolicMatrices]
+    popConvert: Optional[List[List[int]]]
+
+    # TODO: validation
+    # 1. admixture proportions should sum to 1
+    # 2. admixture epochs >= 1 (cannot do "after" epoch 0)
+    # 3. admixture source != dest
+    # 4. epoch/demes counts < num pops / epochs
+
+    @staticmethod
+    def from_file(filename: str) -> "UserModel":
+        # Load the configuration and create the symbolic model from it.
+        config = load_model_config(filename)
+        mig = SymbolicMatrices.from_config(config["migration"])
+        coal = SymbolicMatrices.from_config(config["coalescence"], is_vector=True)
+        epochs = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
+        if "growth" in config:
+            grow = SymbolicMatrices.from_config(config["growth"], is_vector=True)
+        else:
+            grow = None
+        if "admixture" in config:
+            admix = AdmixtureGroup.from_config(config["admixture"])
+        else:
+            admix = None
+        pop_names = config.get("pop_names", [])
+        pop_count = config.get("pop_count", len(pop_names))
+        assert pop_count > 0, f"Model with no populations: specify 'pop_names' or 'pop_count' in your model"
+        if not pop_names:
+            pop_names = [f"pop_{i}" for i in range(pop_count)]
+        ploidy = int(config.get("ploidy", 2))
+        popConvert = config.get("populationConversion", [])
+        return UserModel(
+            ploidy=ploidy,
+            pop_count=pop_count,
+            pop_names=pop_names,
+            migration=mig,
+            coalescence=coal,
+            epochs=epochs,
+            growth=grow,
+            popConvert=popConvert,
+        )
+    
+    @property
+    def num_epochs(self) -> int:
+        return self.epochs.num_epochs
+    
+    def to_solver_model(self, generate_ground_truth: bool = False):
+        return ModelSolverInput.construct(
+            self.migration,
+            self.coalescence,
+            self.growth,
+            self.admixture,
+            self.epochs,
+            init_from_ground_truth=generate_ground_truth,
+            pop_names=self.pop_names,
+            ploidy=self.ploidy,
+        )
+ 
 
 @dataclass_json
 @dataclass
@@ -246,7 +379,6 @@ class BoundedVariable:
         )
 
 
-# The Q-matrix requires that the diagonal be the negative sum of the off-diagonal for each row.
 # Instead of enforcing that here with parameter applications, the solver enforces that later.
 def construct_stoch_matrix(
     M_symbolic: SymbolicMatrices,
@@ -643,6 +775,8 @@ def validate_model(model_filename: str):
     )
     ploidy = config["ploidy"]
     assert ploidy >= 1 and ploidy < 8, f"Unexpected ploidy value of {ploidy}"
+    pop_names = config.get("pop_names", [])
+    pop2index = {name: index for index, name in enumerate(pop_names)}
     M_symbolic = SymbolicMatrices.from_config(config["migration"])
     q_symbolic = SymbolicMatrices.from_config(config["coalescence"], is_vector=True)
     if "growth" in config:
@@ -655,7 +789,7 @@ def validate_model(model_filename: str):
     assert M_symbolic.num_epochs >= 1, "There must be at least 1 epoch"
     epochs_symbolic = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
     assert (
-        M_symbolic.num_epochs == len(epochs_symbolic.epoch_times) + 1
+        M_symbolic.num_epochs == epochs_symbolic.num_epochs
     ), "For k epochs, there must be k-1 epochTimeSplit parameters"
     popConvert = config.get("populationConversion", [])
     if popConvert is None:

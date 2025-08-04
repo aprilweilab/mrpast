@@ -134,9 +134,11 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
                     coal_vects[e_idx][d_idx] = param_idx
                 last_epoch = max(last_epoch, e_idx)
                 e_idx = (e_idx + 1) if (e_idx + 1) < len(epochs_by_start) else None
-        # Set the population splits.
-        for a in d.ancestors:
-            output_model["populationConversion"][last_epoch][d_idx] = name2deme[a]
+        if d.ancestors:
+            assert len(d.ancestors) == 1, "mrpast does not support admixture; only 1-to-1 population split"
+            # Set the population splits.
+            for a in d.ancestors:
+                output_model["populationConversion"][last_epoch][d_idx] = name2deme[a]
         # Mark the population as dead in the relevant epochs.
         for e_idx in range(last_epoch + 1, num_epochs - 1):
             output_model["populationConversion"][e_idx][d_idx] = float("NaN")

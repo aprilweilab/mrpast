@@ -25,6 +25,7 @@ from mrpast.helpers import (
     load_ratemap,
 )
 from mrpast.model import (
+    UserModel,
     load_model_config,
     SymbolicMatrices,
     SymbolicEpochs,
@@ -35,30 +36,7 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
     """
     Create the msprime Demography object for the given mrpast model filename.
     """
-    config = load_model_config(model)
-    ploidy = config["ploidy"]
-    M_symbolic = SymbolicMatrices.from_config(config["migration"])
-    q_symbolic = SymbolicMatrices.from_config(config["coalescence"], is_vector=True)
-    if "growth" in config:
-        g_symbolic = SymbolicMatrices.from_config(config["growth"], is_vector=True)
-    else:
-        g_symbolic = None
-    epochs_symbolic = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
-    assert M_symbolic.num_epochs >= 1
-    popConvert = config.get("populationConversion", [])
-    if popConvert is None:
-        popConvert = []
-    assert len(popConvert) == M_symbolic.num_epochs - 1
-
-    npops = [M_symbolic.num_demes(i) for i in range(M_symbolic.num_epochs)]
-    assert all(
-        map(lambda n: n == npops[0], npops)
-    ), "All matrices must have the same population size"
-    for row in popConvert:
-        assert len(row) == npops[0]
-
-    pop_names = config.get("pop_names", [f"pop_{i}" for i in range(npops[0])])
-    assert len(pop_names) == npops[0], f"pop_names has wrong length, must be {npops[0]}"
+    user_model = UserModel.from_file(model)
 
     # ASSUMPTION: Epoch_0 (the most recent) lists all the populations. Any population can be "unused"
     # in any epoch. If Epoch_i "introduces" a new population (backwards in time) then that population
@@ -78,13 +56,13 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
     #   population has become active by that Epoch due to a migration event.
 
     def Ne_from_coal_rate(coal_rate: float) -> float:
-        return 1 / (ploidy * coal_rate)
+        return 1 / (user_model.ploidy * coal_rate)
 
     # Migration is thought of backwards here, and in the MrPast model. So if we
     # have non-zero migration from A->B, it means that in forward-time people migrated
     # from B->A
-    num_epochs = len(npops)
-    num_pops = npops[0]
+    num_epochs = user_model.num_epochs
+    num_pops = user_model.pop_count
     demography = msprime.Demography()
     active_pops = []
     # Pass 1: Add all of the populations and determine their initial size.
@@ -93,7 +71,7 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
         size = None
         for epoch in range(num_epochs):
             # ne = 1 / (lambda * ploidy)
-            rate_param = q_symbolic.get_parameter(q_symbolic.matrices[epoch][i])
+            rate_param = user_model.coalescence.get_parameter(user_model.coalescence.matrices[epoch][i])
             if rate_param is not None:
                 if epoch == 0:
                     initially_active = True
@@ -104,38 +82,39 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
             rate_param is not None
         ), "Every population must have at least one epoch with a coalescent rate"
         growth_rate = None
-        if g_symbolic is not None:
-            grate_param = g_symbolic.get_parameter(g_symbolic.matrices[epoch][i])
+        if user_model.growth is not None:
+            grate_param = user_model.growth.get_parameter(user_model.growth.matrices[epoch][i])
             if grate_param is not None:
                 growth_rate = grate_param.ground_truth
         demography.add_population(
             initial_size=size,
             initially_active=initially_active,
             growth_rate=growth_rate,
-            name=pop_names[i],
+            name=user_model.pop_names[i],
         )
+    del rate_param
+
     # Pass 2: Find all population splits by identifying changes in populationConversion
     dead_pops = {}
     for dest_epoch in range(1, num_epochs):
         source_epoch = dest_epoch - 1
         derived = defaultdict(list)
         for src_pop in range(num_pops):
-            dest_pop = popConvert[source_epoch][src_pop]
+            dest_pop = user_model.popConvert[source_epoch][src_pop]
             if dest_pop != src_pop and src_pop not in dead_pops:
                 derived[dest_pop].append(src_pop)
                 dead_pops[src_pop] = dest_epoch
-        epoch_time = epochs_symbolic.epoch_times[source_epoch].ground_truth
+        epoch_time = user_model.epochs.epoch_times[source_epoch].ground_truth
         for dest_pop, derived_list in derived.items():
             demography.add_population_split(
                 time=epoch_time, derived=list(derived_list), ancestral=dest_pop
             )
-    del rate_param
 
     # Pass 3: setup the initial migration rates and rate change events.
     for epoch in range(num_epochs):
         epoch_time = None
         if epoch > 0:
-            epoch_time = epochs_symbolic.epoch_times[epoch - 1].ground_truth
+            epoch_time = user_model.epochs.epoch_times[epoch - 1].ground_truth
         for i in range(num_pops):
             # We skip any dead populations. The simulator will yell at us for trying to make changes to them.
             if dead_pops.get(i, 2**32) <= epoch:
@@ -143,27 +122,27 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
 
             # Handle coalescence rate (effective population size) changes
             if epoch > 0:
-                crate_idx = q_symbolic.matrices[epoch][i]
-                prev_crate_idx = q_symbolic.matrices[epoch - 1][i]
+                crate_idx = user_model.coalescence.matrices[epoch][i]
+                prev_crate_idx = user_model.coalescence.matrices[epoch - 1][i]
                 prev_grate_param_idx = None
                 grate_param_idx = None
-                if g_symbolic is not None:
-                    grate_param_idx = g_symbolic.matrices[epoch][i]
-                    prev_grate_param_idx = g_symbolic.matrices[epoch - 1][i]
+                if user_model.growth is not None:
+                    grate_param_idx = user_model.growth.matrices[epoch][i]
+                    prev_grate_param_idx = user_model.growth.matrices[epoch - 1][i]
                 if (
                     prev_crate_idx != crate_idx
                     and prev_crate_idx != 0
                     and crate_idx != 0
                 ) or (grate_param_idx != prev_grate_param_idx):
-                    crate_param = q_symbolic.get_parameter(crate_idx)
+                    crate_param = user_model.coalescence.get_parameter(crate_idx)
                     if crate_param is not None:
                         size = Ne_from_coal_rate(crate_param.ground_truth)
                     else:
                         size = 0
 
                     growth_rate = 0
-                    if g_symbolic is not None:
-                        grate_param = g_symbolic.get_parameter(grate_param_idx)
+                    if user_model.growth is not None:
+                        grate_param = user_model.growth.get_parameter(grate_param_idx)
                         if grate_param is not None:
                             growth_rate = grate_param.ground_truth
                             print(f"Changing growth rate to {growth_rate}")
@@ -177,11 +156,11 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
 
             # Handle migration with all other populations.
             for j in range(num_pops):
-                mrate_idx = M_symbolic.matrices[epoch][i, j]
-                mrate_param = M_symbolic.get_parameter(mrate_idx)
+                mrate_idx = user_model.migration.matrices[epoch][i, j]
+                mrate_param = user_model.migration.get_parameter(mrate_idx)
                 prev_mrate_idx = None
                 if epoch > 0:
-                    prev_mrate_idx = M_symbolic.matrices[epoch - 1][i, j]
+                    prev_mrate_idx = user_model.migration.matrices[epoch - 1][i, j]
 
                 # "The entry of [migration rate matrix] is the expected number of migrants moving from population i
                 #    to population j per generation, divided by the size of population j."
