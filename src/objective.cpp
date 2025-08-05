@@ -119,8 +119,6 @@ std::vector<MatrixXd> loadCMatrices(json& inputListOfMatrices) {
     return std::move(result);
 }
 
-MatrixXd loadPopConversion(json& inputJson) { return loadJsonMatrix(inputJson, POP_CONVERT_KEY); }
-
 /**
  * Both input and output values are in generations.
  */
@@ -144,14 +142,20 @@ void verifyQMatrix(const MatrixXd& sMatrix) {
 }
 #endif
 
+double getGroundTruth(const json& parameter) {
+    double ground_truth = std::numeric_limits<float>::quiet_NaN();
+    if (parameter.contains("ground_truth") && !parameter["ground_truth"].is_null()) {
+        ground_truth = parameter["ground_truth"];
+    }
+    return ground_truth;
+}
+
 void ParameterSchema::load(const json& inputData) {
     m_paramRescale.resize(0);
     m_inputJson = inputData;
+    // EPOCH PARAMETERS
     for (const auto& parameter : inputData.at(EPOCH_TIMES_KEY)) {
-        double ground_truth = std::numeric_limits<float>::quiet_NaN();
-        if (parameter.contains("ground_truth")) {
-            ground_truth = parameter["ground_truth"];
-        }
+        const double ground_truth = getGroundTruth(parameter);
         BoundedVariable bv = {parameter["init"],
                               parameter["lb"],
                               parameter["ub"],
@@ -168,6 +172,7 @@ void ParameterSchema::load(const json& inputData) {
     }
     m_numEpochs = m_eParams.size() + m_eFixed.size() + 1;
     m_sStates = std::vector<size_t>(m_numEpochs);
+    // STOCHASTIC MATRIX (Q-Matrix) PARAMETERS
     for (const auto& parameter : inputData.at(SMATRIX_VALS_KEY)) {
         std::vector<VariableApplication> applications;
         const auto& applyTo = parameter["apply_to"];
@@ -186,10 +191,7 @@ void ParameterSchema::load(const json& inputData) {
             }
             applications.push_back({app["coeff"], i, j, epoch, adjust});
         }
-        double ground_truth = std::numeric_limits<float>::quiet_NaN();
-        if (parameter.contains("ground_truth")) {
-            ground_truth = parameter["ground_truth"];
-        }
+        const double ground_truth = getGroundTruth(parameter);
         BoundedVariable bv = {parameter["init"],
                               parameter["lb"],
                               parameter["ub"],
@@ -203,7 +205,42 @@ void ParameterSchema::load(const json& inputData) {
             m_paramRescale.emplace_back(1.0);
         }
     }
-    RELEASE_ASSERT(m_sParams.size() + m_eParams.size() == m_paramRescale.size());
+    // ADMIXTURE STATE MATRIX PARAMETERS
+    for (const auto& parameter : inputData.at(AMATRIX_PARAMS_KEY)) {
+        RELEASE_ASSERT(parameter["apply_to"].empty());
+        std::vector<size_t> oneMinus;
+        if (parameter.contains("one_minus")) {
+            for (const auto& om : parameter["one_minus"]) {
+                oneMinus.push_back((size_t)om);
+            }
+        }
+        const double ground_truth = getGroundTruth(parameter);
+        BoundedVariable bv = {parameter["init"],
+                              parameter["lb"],
+                              parameter["ub"],
+                              {},
+                              parameter["description"],
+                              ground_truth,
+                              parameter["kind_index"],
+                              std::move(oneMinus)};
+        if (isJsonParamFixed(parameter)) {
+            m_aFixed.push_back(std::move(bv));
+        } else {
+            m_aParams.push_back(std::move(bv));
+            m_paramRescale.emplace_back(1.0);
+        }
+    }
+    for (const auto& application : inputData.at(AMATRIX_APPS_KEY)) {
+        m_admixtureApps.push_back({
+            application["coeff"],
+            application["i"],
+            application["j"],
+            application["epoch"],
+            application["vars"].at(0),
+            application["vars"].at(1),
+        });
+    }
+    RELEASE_ASSERT(m_sParams.size() + m_eParams.size() + m_aParams.size() == m_paramRescale.size());
 }
 
 /**
@@ -384,6 +421,51 @@ createQMatrix(const ParameterSchema& schema, double const* parameters, size_t ep
     return std::move(qMatrix);
 }
 
+#ifndef NDEBUG
+void verifyASMatrix(const MatrixXd& ASMatrix) {
+    const double nearlyZero = 0.000001;
+    for (Eigen::Index i = 0; i < ASMatrix.rows(); i++) {
+        MODEL_ASSERT_MSG(std::abs(1.0 - ASMatrix.row(i).sum()) <= nearlyZero, ASMatrix);
+        for (Eigen::Index j = 0; j < ASMatrix.cols(); j++) {
+            MODEL_ASSERT(ASMatrix(i, j) >= 0);
+        }
+    }
+}
+#endif
+
+/**
+ * Given the vector of concrete parameters values (parameters[]) and the current
+ * epoch, produce the concrete admixture proportion matrix.
+ */
+MatrixXd createASMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch) {
+    assert(epoch < schema.numEpochs());
+
+    // Copy all of the parameter and fixed values into the admixture value vector.
+    const size_t firstParamIdx = schema.m_eParams.size() + schema.m_sParams.size();
+    const size_t numAdmixtureValues = schema.m_aParams.size() + schema.m_aFixed.size();
+    std::vector<double> admixtureValues(numAdmixtureValues);
+    for (size_t i = 0; i < schema.m_aParams.size(); i++) {
+        admixtureValues[i] = schema.fromParam(parameters[i + firstParamIdx], i + firstParamIdx);
+    }
+    for (size_t i = 0; i < schema.m_aFixed.size(); i++) {
+        admixtureValues[schema.m_aParams.size() + i] = schema.m_aFixed.at(i).init;
+    }
+
+    // Now apply these values to construct the matrix, we leave off the coalescence state.
+    const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch) - 1);
+    MatrixXd ASMatrix = MatrixXd::Zero(nStates, nStates);
+    for (const auto& app : schema.m_admixtureApps) {
+        if (app.epoch == epoch) {
+            ASMatrix(SIZE_T_TO_INDEX(app.i), SIZE_T_TO_INDEX(app.j)) =
+                app.coeff * admixtureValues.at(app.v1) * admixtureValues.at(app.v2);
+        }
+    }
+#ifndef NDEBUG
+    verifyASMatrix(ASMatrix);
+#endif
+    return std::move(ASMatrix);
+}
+
 inline size_t numTimeSlices(const std::vector<double>& timeSlices) { return timeSlices.size() + 1; }
 
 struct ModelProbabilities {
@@ -462,13 +544,10 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
                                   double const* parameters,
                                   const std::vector<double>& timeSlices,
                                   const std::vector<double>& epochTimes,
-                                  const MatrixXd& popConvert,
                                   std::vector<std::pair<double, MatrixXd>>* qMatricesByTime = nullptr) {
     const size_t numEpochs = schema.numEpochs();
     assert(numEpochs > 0);
     assert(numEpochs == epochTimes.size() + 1);
-    // Each row of popConvert is for the transition between epoch e and epoch e+1
-    assert(numEpochs == popConvert.rows() + 1);
 
     // Combine all the times into a single timeline just to simplify things.
     std::vector<TimeMarker> allTimes = combineTimeVectors(timeSlices, epochTimes);
@@ -485,7 +564,8 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
     // "i" in Epoch0.
     const double minPop = 0;
     const double maxPop = (double)nStatesEpoch0 - 1;
-    VectorXd currentStateMap = VectorXd::LinSpaced(nStatesEpoch0, minPop, maxPop);
+    // VectorXd currentStateMap = VectorXd::LinSpaced(nStatesEpoch0, minPop, maxPop);
+    MatrixXd currentStateMap = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
     // Resulting coalescence probabilities per time slice
     const Eigen::Index nTimeBins = SIZE_T_TO_INDEX(timeSlices.size()) + 1;
     MatrixXd probsByTime = MatrixXd::Ones(nStatesEpoch0, nTimeBins);
@@ -516,7 +596,8 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
         }
 
         ModelProbabilities probabilities = probabilitiesUpToTime(curMatrix, deltaT);
-        probabilities.coalescence = migrationStateProbsEOPE * probabilities.coalescence(currentStateMap, 0);
+        // probabilities.coalescence = migrationStateProbsEOPE * probabilities.coalescence(currentStateMap, 0);
+        probabilities.coalescence = migrationStateProbsEOPE * (currentStateMap * probabilities.coalescence);
         TRACE_MATRIX(probabilities.coalescence,
                      "coalescence probabilities in epoch " << currentEpoch << " up to time " << time);
 
@@ -543,7 +624,9 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
             assert(newEpoch == currentEpoch + 1);
 
             // Map our current location probabilities back to the epoch0 locations.
-            MatrixXd locProbMappedToEpoch0 = probabilities.locations(currentStateMap, currentStateMap);
+            // MatrixXd locProbMappedToEpoch0 = probabilities.locations(currentStateMap, currentStateMap);
+            MatrixXd locProbMappedToEpoch0 = currentStateMap * probabilities.locations * currentStateMap.transpose();
+            locProbMappedToEpoch0.diagonal() = currentStateMap * probabilities.locations.diagonal();
             TRACE_MATRIX(locProbMappedToEpoch0, "End of epoch " << currentEpoch << " locs");
             // locProbMappedToEpoch0 contains the location probabilities in terms of
             // the initial states, but only for the time period between the end of the
@@ -570,7 +653,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 #endif
 
             epochStart = time;
-            currentStateMap = popConvert.row(SIZE_T_TO_INDEX(currentEpoch));
+            currentStateMap = createASMatrix(schema, parameters, newEpoch);
             currentEpoch = newEpoch;
         }
     }
@@ -597,7 +680,6 @@ class ObservedData {
 public:
     std::vector<MatrixXd> countMatrices;
     std::vector<double> timeSlices;
-    MatrixXd popConvert;
 };
 
 class CachedCMatrix {
@@ -640,7 +722,6 @@ NegLogLikelihoodCostFunctor::NegLogLikelihoodCostFunctor(const std::string& json
     }
     m_observed->timeSlices = ::getTimeSlices(inputJson);
     m_schema.load(inputJson);
-    m_observed->popConvert = loadPopConversion(inputJson);
 
 #if DEBUG_OUTPUT
     std::cerr << "Loaded " << m_observed->countMatrices.size() << " count matrices" << std::endl;
@@ -723,8 +804,7 @@ double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
     }
     double cost = 0.0;
     try {
-        auto probabilityAtTime =
-            modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, m_observed->popConvert);
+        auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
         RELEASE_ASSERT(m_cache->isSet);
         for (Eigen::Index timeK = 0; timeK < probabilityAtTime.cols(); timeK++) {
             const double ll = computeLLForTime(timeK, probabilityAtTime, m_cache->matrix);
@@ -769,8 +849,7 @@ void NegLogLikelihoodCostFunctor::outputTheoreticalCoalMatrix(double const* para
         }
     }
 
-    auto probabilityAtTime =
-        modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, m_observed->popConvert);
+    auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
 
     json outputJson = m_schema.toJsonOutput(parameters, std::numeric_limits<double>::quiet_NaN());
     std::vector<std::vector<double>> matrix;

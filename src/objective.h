@@ -90,6 +90,19 @@ struct BoundedVariable {
     std::string description;
     double ground_truth;
     size_t kind_index;
+    std::vector<size_t> oneMinus;
+};
+
+// An application of a two admixture variables to the admixture state matrix. This is interpreted as:
+//  A[i, j] += (coeff * v1 * v2)
+// Here v1 and v2 are indexes into the admixture vector of variables.
+struct AdmixtureApplication {
+    double coeff;
+    size_t i;
+    size_t j;
+    size_t epoch;
+    size_t v1;
+    size_t v2;
 };
 
 inline bool isJsonParamFixed(const json& parameter) { return (parameter["lb"] == parameter["ub"]); }
@@ -101,6 +114,7 @@ inline bool isJsonParamFixed(const json& parameter) { return (parameter["lb"] ==
 class ParameterSchema {
 public:
     using VarList = std::vector<BoundedVariable>;
+    using VarVector = std::vector<BoundedVariable>;
 
     explicit ParameterSchema(const bool logSpace = false)
         : m_logSpace(logSpace) {}
@@ -203,15 +217,16 @@ public:
 
     bool samplesAreJackknifed() const { return m_inputJson["sampling_description"] == "jackknife"; }
 
-    // Parameters for epoch times
+    // Parameters and fixed values for epoch times
     VarList m_eParams;
-    // Fixed values for epoch times.
     VarList m_eFixed;
-    // Parameters for stochastic matrix (by epoch)
+    // Parameters and fixed values for stochastic matrix (by epoch)
     VarList m_sParams;
-    // Fixed values for stochastic matrix. These are just parameters that are
-    // marked "fixed".
     VarList m_sFixed;
+    // Parameters and fixed values for admixture matrix (by epoch)
+    VarList m_aParams;
+    VarList m_aFixed;
+    std::vector<AdmixtureApplication> m_admixtureApps;
 
 private:
     // We save the actual JSON object, because the output is identical to the

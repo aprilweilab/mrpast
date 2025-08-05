@@ -20,6 +20,7 @@ except ImportError:
     from yaml import Loader, Dumper  # type: ignore
 from yaml import load, dump
 from typing import Dict, Any, List, Tuple, Optional, Union
+from collections import defaultdict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json
 from enum import Enum
@@ -48,6 +49,8 @@ class ParameterKind(str, Enum):
     PARAM_KIND_COAL = "coalescence"
     PARAM_KIND_GROWTH = "growth"
     PARAM_KIND_ADMIXTURE = "admixture"
+    # Admixture parameter that is determined by the sum of other admixture parameters.
+    PARAM_KIND_ADMIX_DET = "admixture_det"
 
 
 class TimeSliceAdjustment(str, Enum):
@@ -61,6 +64,10 @@ class FloatParameter:
     lb: float
     ub: float
     index: int
+
+    @property
+    def is_const(self):
+        return self.lb == self.ub
 
 
 @dataclass_json
@@ -92,6 +99,7 @@ class BoundedVariable:
     kind: str
     kind_index: int
     apply_to: List[VariableApplication] = field(default_factory=list)
+    one_minus: List[int] = field(default_factory=list)
     description: str = ""
     ground_truth: Optional[float] = None
     final: Optional[float] = None
@@ -150,6 +158,19 @@ class BoundedVariable:
             description=self.description,
             ground_truth=self.ground_truth,
         )
+
+
+# Applies two parameters to the admixture state matrix, like:
+#     A[i, j] += (coeff * parameters[v1] * parameters[v2])
+# where parameters is the ordered list of BoundedVariable for admixture (across all epochs).
+@dataclass_json
+@dataclass
+class AdmixtureApplication:
+    coeff: float
+    i: int
+    j: int
+    epoch: int
+    vars: List[int]
 
 
 DemePairIndex = Dict[Tuple[int, int], int]
@@ -363,6 +384,53 @@ class DemeRates(ParamContainer):
         return ParamContainer._from_config(config_entry, DemeRateEntry, DemeRates)
 
 
+@dataclass_json
+@dataclass
+class AdmixtureEntry:
+    epoch: int
+    ancestral: Union[int, str]
+    derived: Union[int, str]
+    proportion: Union[float, ParamRef]
+
+    def resolve_names(self, name2index: Dict[str, int]):
+        if isinstance(self.ancestral, str):
+            self.ancestral = resolve_name(self.ancestral, name2index)
+        if isinstance(self.derived, str):
+            self.derived = resolve_name(self.derived, name2index)
+
+    def unresolve_names(self, names: List[str]):
+        if isinstance(self.ancestral, int):
+            self.ancestral = names[self.ancestral]
+        if isinstance(self.derived, int):
+            self.derived = names[self.derived]
+
+    def get_index_or_value(self) -> Tuple[Optional[int], Optional[float]]:
+        if isinstance(self.proportion, ParamRef):
+            return (self.proportion.param, None)
+        return (None, float(self.proportion))
+
+
+@dataclass
+class AdmixtureGroup(ParamContainer):
+    entries: List[AdmixtureEntry]
+    parameters: List[FloatParameter]
+
+    @property
+    def max_epoch(self) -> int:
+        return max(map(lambda e: e.epoch, self.entries))
+
+    @property
+    def max_deme(self) -> int:
+        return max(
+            max(map(lambda e: int(e.ancestral), self.entries)),
+            max(map(lambda e: int(e.derived), self.entries)),
+        )
+
+    @staticmethod
+    def from_config(config_entry: Dict[str, Any]) -> "AdmixtureGroup":
+        return ParamContainer._from_config(config_entry, AdmixtureEntry, AdmixtureGroup)
+
+
 @dataclass
 class UserModel:
     ploidy: int
@@ -372,7 +440,7 @@ class UserModel:
     coalescence: DemeRates
     epochs: SymbolicEpochs
     growth: DemeRates
-    pop_convert: List[List[int]]
+    admixture: AdmixtureGroup
 
     # TODO: validation
     # 1. admixture proportions should sum to 1
@@ -399,7 +467,7 @@ class UserModel:
         if not pop_names:
             pop_names = [f"pop_{i}" for i in range(pop_count)]
         ploidy = int(config.get("ploidy", DEFAULT_PLOIDY))
-        pop_convert = config.get("populationConversion", []) or []
+        admixture = AdmixtureGroup.from_config(config.get("admixture", {}))
 
         result = UserModel(
             ploidy=ploidy,
@@ -409,7 +477,7 @@ class UserModel:
             coalescence=coal,
             epochs=epochs,
             growth=grow,
-            pop_convert=pop_convert,
+            admixture=admixture,
         )
         result.resolve_names()
 
@@ -418,9 +486,6 @@ class UserModel:
         assert (
             result.ploidy >= 1 and result.ploidy <= 8
         ), f"Unexpected ploidy value of {result.ploidy}"
-        assert (
-            nepoch == len(result.pop_convert) + 1
-        ), "For k epochs, there must be k-1 populationConversion lists"
         assert (
             result.migration.max_deme < result.pop_count
         ), f"Migration entries reference a deme {result.migration.max_deme} that exceeds number of populations {pop_count}"
@@ -447,6 +512,7 @@ class UserModel:
         self.migration.resolve_names(name2index)
         self.coalescence.resolve_names(name2index)
         self.growth.resolve_names(name2index)
+        self.admixture.resolve_names(name2index)
 
     def unresolve_names(self):
         self.migration.unresolve_names(self.pop_names)
@@ -474,6 +540,13 @@ class UserModel:
                 ordered[j, i] = counter
                 counter += 1
         return ordered
+
+    def get_ordered_states(self) -> List[Tuple[int, int]]:
+        states = []
+        for i in range(self.num_demes):
+            for j in range(i, self.num_demes):
+                states.append((i, j))
+        return states
 
     def to_solver_model(self, generate_ground_truth: bool = False):
         return ModelSolverInput.construct(
@@ -632,24 +705,6 @@ def construct_stoch_matrix(
     add_fixed(G_parameters, fixed_grow_params)
 
 
-# This assumes that all the population conversion matrices are written in terms of epoch0, instead
-# of being sequential compositions epoch0 -> epoch1 -> epoch2 -> ...
-def pop_conv_to_state_space(model: UserModel, from_epoch: int) -> List[int]:
-    pop_convert_single = model.pop_convert[from_epoch]
-    deme_pair_index = model.get_pair_ordering()
-    nstates = len(set(deme_pair_index.values()))
-    result = [-1] * nstates
-    for i in range(len(pop_convert_single)):
-        for j in range(len(pop_convert_single)):
-            from_state = deme_pair_index[i, j]
-            dest_i = pop_convert_single[i]
-            dest_j = pop_convert_single[j]
-            to_state = deme_pair_index[dest_i, dest_j]
-            assert result[from_state] == -1 or result[from_state] == to_state
-            result[from_state] = to_state
-    return result
-
-
 CMatrix = List[List[float]]
 
 
@@ -671,15 +726,18 @@ class ModelSolverInput:
     coal_count_matrices: List[CMatrix]
     # (Concrete) times when transitions between time slices/buckets occur (ntimeslices-1)
     time_slices_gen: List[float]
-    # (Concrete) population conversion matrix, by epoch. E.g., the 0th vector (row) describes how populations
-    #    move from epoch0->epoch1.
-    pop_convert: List[List[int]]
     # How to make use of coal_count_matrices
     observation_mode: str = "average"
     # How to interpret the samples in coal_count_matrices
     sampling_description: Optional[str] = None
     # Sampling hashes: a hash of the trees involved in each sample
     sampling_hashes: Optional[List[str]] = None
+    # The admixture state matrix is made up of a bunch of (possible const) parameters and a separate list of
+    # applications of those parameters. The admixture matrix requires multiplication of multiple parameters
+    # so we can't use the BoundedVariable's apply_to field.
+    # FIXME eventually would be nice to change the smatrix to use a separate application list as well.
+    amatrix_parameters: List[BoundedVariable] = field(default_factory=list)
+    amatrix_applications: List[AdmixtureApplication] = field(default_factory=list)
 
     # Extra data: unused by the solver, but useful to have as pass-through.
     pop_names: Optional[List[str]] = None
@@ -725,19 +783,132 @@ class ModelSolverInput:
             )
             for i, t in enumerate(model.epochs.epoch_times)
         ]
-        # Convert the population conversion matrices for single individuals to paired, to match our state-space
-        pop_convert = [
-            pop_conv_to_state_space(model, e) for e in range(model.num_epochs - 1)
-        ]
+
+        # Generate the amatrix parameter applications for all except the first epoch.
+        amatrices: List[List[List[Optional[int]]]] = []
+        for epoch in range(1, model.num_epochs):
+            amatrices.append(
+                [[None for _ in range(model.num_demes)] for _ in range(model.num_demes)]
+            )
+        amatrix_params = []
+        for i, entry in enumerate(model.admixture.entries):
+            assert entry.epoch > 0
+            assert entry.epoch < model.num_epochs
+            if isinstance(entry.proportion, ParamRef):
+                amatrix_params.append(
+                    BoundedVariable.from_float_parameter(
+                        model.admixture.get_parameter(entry.proportion.param),
+                        ParameterKind.PARAM_KIND_ADMIXTURE,
+                        i,
+                        not init_from_ground_truth,
+                        f"Admixture proportion between {entry.ancestral} and {entry.derived}",
+                    )
+                )
+            else:
+                amatrix_params.append(
+                    BoundedVariable.from_float_value(
+                        entry.proportion,
+                        ParameterKind.PARAM_KIND_ADMIXTURE,
+                        i,
+                        f"Admixture proportion between {entry.ancestral} and {entry.derived}",
+                    )
+                )
+            amatrices[entry.epoch - 1][int(entry.derived)][int(entry.ancestral)] = i
+        # Special constant of 1 that we use throughout.
+        param_const_one = BoundedVariable(
+            1, 1, 1, ParameterKind.PARAM_KIND_ADMIXTURE, 0
+        )
+        index_const_one = len(amatrix_params)
+        amatrix_params.append(param_const_one)
+        # Implicitly, every deme is derived from itself every epoch. We make that explicit here.
+        # We also do some sanity checks, and ensure the proper degrees of freedom for each admixture event.
+        for epoch in range(1, model.num_epochs):
+            by_derived = defaultdict(list)
+            for i, entry in enumerate(model.admixture.entries):
+                if entry.epoch == epoch:
+                    by_derived[entry.derived].append((i, entry))
+            for i in range(model.num_demes):
+                if len(by_derived[i]) == 0:
+                    amatrices[epoch - 1][i][i] = index_const_one
+                elif len(by_derived[i]) == 1:
+                    _, entry = by_derived[i][0]
+                    index, value = entry.get_index_or_value()
+                    if index is not None:
+                        a_param = model.admixture.get_parameter(index)
+                        assert (
+                            a_param.is_const
+                        ), f"Admixture parameter {index} must be constant: there is only one ancestral deme"
+                        assert (
+                            a_param.lb == 1
+                        ), f"Admixture parameter {index} must be 1: there is only one ancestral deme"
+                    else:
+                        assert value is not None
+                        assert (
+                            value == 1
+                        ), f"Admixture proportion for demes {entry.ancestral}->{entry.derived} must be 1: there is only one ancestral deme"
+                else:
+                    assert not any(
+                        map(lambda t: t[1].ancestral == i, by_derived[i])
+                    ), "A deme cannot derive admixture from itself."
+                    other_indexes = list(map(lambda t: t[0], by_derived[i][:-1]))
+                    last_index, _ = by_derived[i][-1]
+                    amatrix_params[last_index].one_minus = other_indexes
+                    amatrix_params[last_index].kind = ParameterKind.PARAM_KIND_ADMIX_DET
+
+        amatrix_apps = []
+        all_states = model.get_ordered_states()
+        # print(f"STATES: {all_states}")
+        for epoch in range(1, model.num_epochs):
+            amatrix = amatrices[epoch - 1]
+            # print(f"EPOCH: {epoch} has state 01->01 (1->1) as {amatrix[all_states[1][0]][all_states[1][0]]},{amatrix[all_states[1][1]][all_states[1][1]]}")
+            for from_state, (i, j) in enumerate(all_states):
+                for to_state, (k, l) in enumerate(all_states):
+
+                    def make_app(coeff: float, *possible_vars):
+                        var_list = []
+                        for v in possible_vars:
+                            if v is not None:
+                                var_list.append(v)
+                        # Both lineages have to move, otherwise we are not going to do an instantaneous move of
+                        # items from state A -> B (instead, somewhere else we'll move from state A to C or something)
+                        if len(var_list) == 2:
+                            return AdmixtureApplication(
+                                coeff, from_state, to_state, epoch, var_list
+                            )
+                        return None
+
+                    app2 = None
+                    if i == j:
+                        # v = A[i, k]*A[i, k]
+                        if k == l:
+                            app = make_app(1, amatrix[i][k], amatrix[i][k])
+                        # v = 2*A[i, k]*A[i, l]
+                        else:
+                            app = make_app(2, amatrix[i][k], amatrix[i][l])
+                    else:
+                        # v = A[i, k]*A[j, k]
+                        if k == l:
+                            app = make_app(1, amatrix[i][k], amatrix[j][k])
+                        # v = A[i, k]*A[j, l] + A[i, l]*A[j, k]
+                        # This addition comes from two separate applications
+                        else:
+                            app = make_app(1, amatrix[i][k], amatrix[j][l])
+                            app2 = make_app(1, amatrix[i][l], amatrix[j][k])
+                    if app is not None:
+                        amatrix_apps.append(app)
+                    if app2 is not None:
+                        amatrix_apps.append(app2)
+
         # Construct the (JSON-ifiable) input object that will be sent to the solver component
         return ModelSolverInput(
             epoch_times_gen=epoch_times,
             smatrix_values_ne__gen=smatrix_values,
             coal_count_matrices=[],
             time_slices_gen=[],
-            pop_convert=pop_convert,
             pop_names=pop_names,
             ploidy=ploidy,
+            amatrix_parameters=amatrix_params,
+            amatrix_applications=amatrix_apps,
         )
 
     def randomize(self) -> "ModelSolverInput":
@@ -746,9 +917,10 @@ class ModelSolverInput:
             smatrix_values_ne__gen=[v.randomize() for v in self.smatrix_values_ne__gen],
             coal_count_matrices=self.coal_count_matrices,
             time_slices_gen=self.time_slices_gen,
-            pop_convert=self.pop_convert,
             sampling_description=self.sampling_description,
             sampling_hashes=self.sampling_hashes,
+            amatrix_parameters=[v.randomize() for v in self.amatrix_parameters],
+            amatrix_applications=self.amatrix_applications,
         )
 
     @property

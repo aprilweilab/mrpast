@@ -83,6 +83,8 @@ constexpr const char* POP_CONVERT_KEY = "pop_convert";
 constexpr const char* EFFECTIVE_POPSIZE_KEY = "effective_popsize_" UNIT_INDIVIDUALS;
 constexpr const char* OBSERVATION_MODE_KEY = "observation_mode";
 constexpr const char* SAMPLING_HASHES_KEY = "sampling_hashes";
+constexpr const char* AMATRIX_PARAMS_KEY = "amatrix_parameters";
+constexpr const char* AMATRIX_APPS_KEY = "amatrix_applications";
 
 // The minimum value that we use in any computations, the square-root of the
 // minimum representable floating point value.

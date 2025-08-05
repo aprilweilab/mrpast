@@ -45,7 +45,46 @@ epochTimeSplit:
 - {"ground_truth": 848.0, "lb": 100.0, "ub": 1200.0, "index": 1}
 - {"ground_truth": 5600.0, "lb": 1200.0, "ub": 7200.0, "index": 2}
 - {"ground_truth": 8800.0, "lb": 7200.0, "ub": 25000.0, "index": 3}
-populationConversion:
-- [0, 1, 1]
-- [0, 0, 0]
-- [0, 0, 0]
+# Admixture occurs instantaneously at the beginning (backward in time) of the given epoch
+admixture:
+  entries: 
+  - {"epoch": 1, "ancestral": "CEU", "derived": "CHB", "proportion": 1}
+  - {"epoch": 2, "ancestral": "YRI", "derived": "CEU", "proportion": 1}
+
+# For the admixture matrix, the row is the "derived" and the column is the "ancestral"
+# Same for the admixture state matrix.
+# Anything not listed as derived above, gets identity. That is, epoch0, p(YRI->YRI) = A[0, 0] = 1
+#
+# The admixture state matrix for this looks like:
+#
+#      00            01            02            11            12            22
+#  00  A00*A00       2*A00*A01     2*A00*A02     A01*A01       2*(A01*A02)   A02*A02
+#  01  A00*A10       (A00*A11)+(A01*A10)
+#                    ^-- if there is any admixture from 0, this will be 0
+#                        so we can just pick one of these.
+#  02
+#  11
+#  12                              (A10*A22)+(A12*A20)
+#  22  A20*A20       2*A20*A21     2*(A20*A22)
+
+# We have ij -> kl
+#
+# The four cases are:
+# if i == j:
+#   if k == l:
+#     v = A[i, k]*A[i, k]
+#   else:
+#     v = 2*A[i, k]*A[i, l]
+# else:
+#   if k == l:
+#     v = A[i, k]*A[j, k]
+#   else:
+#     v = A[i, k]*A[j, l] + A[i, l]*A[j, k]
+#         ^--- but one of these will be zero, based on admixture matrix input.
+#
+# So we ultimately have the form:
+#   (c*A[x, y]*A[z, w]) that applies to a specific index (a, b) in the admixture state matrix.
+#
+# Given an admixture matrix A. Here, A[x, y] and A[z, w] correspond to a parameter from the input.
+# So what we really have is:
+#   (c*P_x*P_y) for parameters indexed x and y
