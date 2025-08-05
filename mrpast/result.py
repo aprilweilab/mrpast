@@ -243,9 +243,11 @@ def draw_graphs(
         matplotlib.pyplot.cm.Dark2 colormap is used.
     :param x_offset: The offset from the X-axis to start drawing.
     :param coal_values: If non-None, use this list of coalescence rate values instead of the
-        ground-truth values from the model.
+        ground-truth values from the model. This only works if the model has densely packed
+        parameters, with no parameter index gaps.
     :param mig_values: If non-None, use this list of migration rate values instead of the
-        ground-truth values from the model.
+        ground-truth values from the model. This only works if the model has densely packed
+        parameters, with no parameter index gaps.
     """
     assert (
         nx is not None and plt is not None
@@ -253,52 +255,45 @@ def draw_graphs(
     if cmap is None:
         cmap = plt.cm.RdYlBu  # type: ignore
     G = nx.DiGraph()
-    model_config = mrpast.model.load_model_config(model_file)
-    ploidy = model_config["ploidy"]
-    epochs = len(model_config["coalescence"]["vectors"])
+    model = mrpast.model.UserModel.from_file(model_file)
     base_node_id = 0
     node_sizes = []
     node_colors = []
     y_offset = 0.0
     pos: Optional[Dict[Any, Any]] = None
 
+    # FIXME: neither of these functions work if there are gaps in the parameter indexing.
     def get_coal_value(coal_param_idx):
         if coal_values is not None:
-            return coal_values[coal_param_idx]
-        return model_config["coalescence"]["parameters"][coal_param_idx]["ground_truth"]
+            return coal_values[coal_param_idx - 1]
+        return model.coalescence.get_parameter(coal_param_idx).ground_truth
 
     def get_mig_value(mig_param_idx):
         if mig_values is not None:
-            return mig_values[mig_param_idx]
-        return model_config["migration"]["parameters"][mig_param_idx]["ground_truth"]
+            return mig_values[mig_param_idx - 1]
+        return model.migration.get_parameter(mig_param_idx).ground_truth
 
     avg_mig = 0.0
-    for i in range(len(model_config["migration"]["parameters"])):
-        avg_mig += get_mig_value(i)
-    avg_mig /= len(model_config["migration"]["parameters"])
+    for p in model.migration.parameters:
+        avg_mig += get_mig_value(p.ground_truth)
+    avg_mig /= len(model.migration.parameters)
 
     max_popsize = 0
-    for epoch in reversed(range(epochs)):
-        for param_idx in model_config["coalescence"]["vectors"][epoch]:
-            if param_idx > 0:
-                param = model_config["coalescence"]["parameters"][param_idx - 1]
-                pop_size = 1 / (ploidy * get_coal_value(param_idx - 1))
-                if pop_size > max_popsize:
-                    max_popsize = pop_size
+    for entry in model.coalescence.entries:
+        if isinstance(entry.rate, mrpast.model.ParamRef):
+            pop_size = 1 / (model.ploidy * get_coal_value(entry.rate.param))
+            if pop_size > max_popsize:
+                max_popsize = pop_size
 
-    for epoch in reversed(range(epochs)):
-        coal_vector = model_config["coalescence"]["vectors"][epoch]
-        mig_matrix = model_config["migration"]["matrices"][epoch]
+    for epoch in reversed(range(model.num_epochs)):
+        pop_sizes = [0 for _ in range(model.num_demes)]
+        for i in range(model.num_demes):
+            entry = model.coalescence.get_entry(epoch, i)
+            if entry is not None:
+                if isinstance(entry.rate, mrpast.model.ParamRef):
+                    pop_sizes[i] = 1 / (model.ploidy * get_coal_value(entry.rate.param))
 
-        num_demes = len(coal_vector)
-        pop_sizes = [0 for _ in range(num_demes)]
-
-        for i in range(num_demes):
-            param_idx = coal_vector[i]
-            if param_idx > 0:
-                param = model_config["coalescence"]["parameters"][param_idx - 1]
-                pop_sizes[i] = 1 / (ploidy * get_coal_value(param_idx - 1))
-        nodes = [i for i in range(num_demes) if pop_sizes[i] > 0]
+        nodes = [i for i in range(model.num_demes) if pop_sizes[i] > 0]
         node_sizes.extend(
             [max(0, (pop_sizes[i] / max_popsize) * max_node_size) for i in nodes]
         )
@@ -306,16 +301,16 @@ def draw_graphs(
 
         for i in nodes:
             G.add_node(base_node_id + i)
-            for j in range(num_demes):
-                param_idx = mig_matrix[i][j]
-                if param_idx > 0:
-                    param = model_config["migration"]["parameters"][param_idx - 1]
-                    w = math.log10(get_mig_value(param_idx - 1) / avg_mig)
-                    G.add_edge(
-                        base_node_id + i,
-                        base_node_id + j,
-                        weight=w,
-                    )
+            for j in range(model.num_demes):
+                entry = model.migration.get_entry(epoch, i, j)
+                if entry is not None:
+                    if isinstance(entry.rate, mrpast.model.ParamRef):
+                        w = math.log10(get_mig_value(entry.rate.param) / avg_mig)
+                        G.add_edge(
+                            base_node_id + i,
+                            base_node_id + j,
+                            weight=w,
+                        )
 
         if grid_cols is not None:
             if pos is None:
@@ -331,7 +326,7 @@ def draw_graphs(
             y_offset -= (len(nodes) // grid_cols) + epoch_spacing
         else:
             pos = None
-        base_node_id += num_demes
+        base_node_id += model.num_demes
 
     weights = [G[u][v]["weight"] for u, v in G.edges()]
     if popsize_color is None:

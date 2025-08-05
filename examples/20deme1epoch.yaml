@@ -1,358 +1,174 @@
 ploidy: 2
+pop_count: 20
 coalescence:
-  vectors:
-  - [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+  entries:
+  - {"epoch": 0, "deme": 0, "rate": {"param": 1}}
+  - {"epoch": 0, "deme": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": 2, "rate": {"param": 3}}
+  - {"epoch": 0, "deme": 3, "rate": {"param": 4}}
+  - {"epoch": 0, "deme": 4, "rate": {"param": 5}}
+  - {"epoch": 0, "deme": 5, "rate": {"param": 6}}
+  - {"epoch": 0, "deme": 6, "rate": {"param": 7}}
+  - {"epoch": 0, "deme": 7, "rate": {"param": 8}}
+  - {"epoch": 0, "deme": 8, "rate": {"param": 9}}
+  - {"epoch": 0, "deme": 9, "rate": {"param": 10}}
+  - {"epoch": 0, "deme": 10, "rate": {"param": 11}}
+  - {"epoch": 0, "deme": 11, "rate": {"param": 12}}
+  - {"epoch": 0, "deme": 12, "rate": {"param": 13}}
+  - {"epoch": 0, "deme": 13, "rate": {"param": 14}}
+  - {"epoch": 0, "deme": 14, "rate": {"param": 15}}
+  - {"epoch": 0, "deme": 15, "rate": {"param": 16}}
+  - {"epoch": 0, "deme": 16, "rate": {"param": 17}}
+  - {"epoch": 0, "deme": 17, "rate": {"param": 18}}
+  - {"epoch": 0, "deme": 18, "rate": {"param": 19}}
+  - {"epoch": 0, "deme": 19, "rate": {"param": 20}}
   parameters:
-  - ground_truth: 5.077924e-04
-    lb: 1.0e-05
-    ub: 0.01
-    index: 1
-  - ground_truth: 8.364338e-04
-    lb: 1.0e-05
-    ub: 0.01
-    index: 2
-  - ground_truth: 8.779979e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 3
-  - ground_truth: 5.430444e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 4
-  - ground_truth: 5.430444e-04
-    lb: 1.0e-05
-    ub: 0.01
-    index: 5
-  - ground_truth: 0.00016078033758503007
-    lb: 1.0e-5
-    ub: 0.01
-    index: 6
-  - ground_truth: 0.001116338901687122
-    lb: 1.0e-5
-    ub: 0.01
-    index: 7
-  - ground_truth: 6.294280435313211e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 8
-  - ground_truth: 0.00020430538939645044
-    lb: 1.0e-5
-    ub: 0.01
-    index: 9
-  - ground_truth: 0.0002522382918480849
-    lb: 1.0e-5
-    ub: 0.01
-    index: 10
-  - ground_truth: 0.0002508036356997956
-    lb: 1.0e-5
-    ub: 0.01
-    index: 11
-  - ground_truth: 5.737870990328752e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 12
-  - ground_truth: 6.205184304511677e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 13
-  - ground_truth: 0.00017090789839437108
-    lb: 1.0e-5
-    ub: 0.01
-    index: 14
-  - ground_truth: 6.584009612640476e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 15
-  - ground_truth: 0.0015043757166814165
-    lb: 1.0e-5
-    ub: 0.01
-    index: 16
-  - ground_truth: 8.468295456303138e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 17
-  - ground_truth: 0.0011434649343112682
-    lb: 1.0e-5
-    ub: 0.01
-    index: 18
-  - ground_truth: 0.00024700085864890105
-    lb: 1.0e-5
-    ub: 0.01
-    index: 19
-  - ground_truth: 0.0001225209937206409
-    lb: 1.0e-5
-    ub: 0.01
-    index: 20
-epochTimeSplit: null
-populationConversion: null
+  - {"ground_truth": 0.0005077924, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 0.0008364338, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 8.779979e-05, "lb": 1e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 5.430444e-05, "lb": 1e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 0.0005430444, "lb": 1e-05, "ub": 0.01, "index": 5}
+  - {"ground_truth": 0.00016078033758503007, "lb": 1e-05, "ub": 0.01, "index": 6}
+  - {"ground_truth": 0.001116338901687122, "lb": 1e-05, "ub": 0.01, "index": 7}
+  - {"ground_truth": 6.294280435313211e-05, "lb": 1e-05, "ub": 0.01, "index": 8}
+  - {"ground_truth": 0.00020430538939645044, "lb": 1e-05, "ub": 0.01, "index": 9}
+  - {"ground_truth": 0.0002522382918480849, "lb": 1e-05, "ub": 0.01, "index": 10}
+  - {"ground_truth": 0.0002508036356997956, "lb": 1e-05, "ub": 0.01, "index": 11}
+  - {"ground_truth": 5.737870990328752e-05, "lb": 1e-05, "ub": 0.01, "index": 12}
+  - {"ground_truth": 6.205184304511677e-05, "lb": 1e-05, "ub": 0.01, "index": 13}
+  - {"ground_truth": 0.00017090789839437108, "lb": 1e-05, "ub": 0.01, "index": 14}
+  - {"ground_truth": 6.584009612640476e-05, "lb": 1e-05, "ub": 0.01, "index": 15}
+  - {"ground_truth": 0.0015043757166814165, "lb": 1e-05, "ub": 0.01, "index": 16}
+  - {"ground_truth": 8.468295456303138e-05, "lb": 1e-05, "ub": 0.01, "index": 17}
+  - {"ground_truth": 0.0011434649343112682, "lb": 1e-05, "ub": 0.01, "index": 18}
+  - {"ground_truth": 0.00024700085864890105, "lb": 1e-05, "ub": 0.01, "index": 19}
+  - {"ground_truth": 0.0001225209937206409, "lb": 1e-05, "ub": 0.01, "index": 20}
 migration:
-  matrices:
-  - [ [0, 2, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [5, 0, 4, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 8, 0, 7, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 11, 0, 10, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 13, 0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [14, 0, 0, 0, 0, 0, 16, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 17, 0, 0, 0, 20, 0, 19, 0, 0, 0, 18, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 21, 0, 0, 0, 24, 0, 23, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 25, 0, 0, 0, 28, 0, 27, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 29, 0, 0, 0, 31, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 34, 0, 0, 0, 33, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 35, 0, 0, 0, 38, 0, 37, 0, 0, 0, 36, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 39, 0, 0, 0, 42, 0, 41, 0, 0, 0, 40, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 43, 0, 0, 0, 46, 0, 45, 0, 0, 0, 44, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 47, 0, 0, 0, 49, 0, 0, 0, 0, 0, 48],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 51, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 52, 0, 0, 0, 54, 0, 53, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 55, 0, 0, 0, 57, 0, 56, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 58, 0, 0, 0, 60, 0, 59],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 61, 0, 0, 0, 62, 0] ]
+  entries:
+  - {"epoch": 0, "source": 0, "dest": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "source": 0, "dest": 5, "rate": {"param": 1}}
+  - {"epoch": 0, "source": 1, "dest": 0, "rate": {"param": 5}}
+  - {"epoch": 0, "source": 1, "dest": 2, "rate": {"param": 4}}
+  - {"epoch": 0, "source": 1, "dest": 6, "rate": {"param": 3}}
+  - {"epoch": 0, "source": 2, "dest": 1, "rate": {"param": 8}}
+  - {"epoch": 0, "source": 2, "dest": 3, "rate": {"param": 7}}
+  - {"epoch": 0, "source": 2, "dest": 7, "rate": {"param": 6}}
+  - {"epoch": 0, "source": 3, "dest": 2, "rate": {"param": 11}}
+  - {"epoch": 0, "source": 3, "dest": 4, "rate": {"param": 10}}
+  - {"epoch": 0, "source": 3, "dest": 8, "rate": {"param": 9}}
+  - {"epoch": 0, "source": 4, "dest": 3, "rate": {"param": 13}}
+  - {"epoch": 0, "source": 4, "dest": 9, "rate": {"param": 12}}
+  - {"epoch": 0, "source": 5, "dest": 0, "rate": {"param": 14}}
+  - {"epoch": 0, "source": 5, "dest": 6, "rate": {"param": 16}}
+  - {"epoch": 0, "source": 5, "dest": 10, "rate": {"param": 15}}
+  - {"epoch": 0, "source": 6, "dest": 1, "rate": {"param": 17}}
+  - {"epoch": 0, "source": 6, "dest": 5, "rate": {"param": 20}}
+  - {"epoch": 0, "source": 6, "dest": 7, "rate": {"param": 19}}
+  - {"epoch": 0, "source": 6, "dest": 11, "rate": {"param": 18}}
+  - {"epoch": 0, "source": 7, "dest": 2, "rate": {"param": 21}}
+  - {"epoch": 0, "source": 7, "dest": 6, "rate": {"param": 24}}
+  - {"epoch": 0, "source": 7, "dest": 8, "rate": {"param": 23}}
+  - {"epoch": 0, "source": 7, "dest": 12, "rate": {"param": 22}}
+  - {"epoch": 0, "source": 8, "dest": 3, "rate": {"param": 25}}
+  - {"epoch": 0, "source": 8, "dest": 7, "rate": {"param": 28}}
+  - {"epoch": 0, "source": 8, "dest": 9, "rate": {"param": 27}}
+  - {"epoch": 0, "source": 8, "dest": 13, "rate": {"param": 26}}
+  - {"epoch": 0, "source": 9, "dest": 4, "rate": {"param": 29}}
+  - {"epoch": 0, "source": 9, "dest": 8, "rate": {"param": 31}}
+  - {"epoch": 0, "source": 9, "dest": 14, "rate": {"param": 30}}
+  - {"epoch": 0, "source": 10, "dest": 5, "rate": {"param": 32}}
+  - {"epoch": 0, "source": 10, "dest": 11, "rate": {"param": 34}}
+  - {"epoch": 0, "source": 10, "dest": 15, "rate": {"param": 33}}
+  - {"epoch": 0, "source": 11, "dest": 6, "rate": {"param": 35}}
+  - {"epoch": 0, "source": 11, "dest": 10, "rate": {"param": 38}}
+  - {"epoch": 0, "source": 11, "dest": 12, "rate": {"param": 37}}
+  - {"epoch": 0, "source": 11, "dest": 16, "rate": {"param": 36}}
+  - {"epoch": 0, "source": 12, "dest": 7, "rate": {"param": 39}}
+  - {"epoch": 0, "source": 12, "dest": 11, "rate": {"param": 42}}
+  - {"epoch": 0, "source": 12, "dest": 13, "rate": {"param": 41}}
+  - {"epoch": 0, "source": 12, "dest": 17, "rate": {"param": 40}}
+  - {"epoch": 0, "source": 13, "dest": 8, "rate": {"param": 43}}
+  - {"epoch": 0, "source": 13, "dest": 12, "rate": {"param": 46}}
+  - {"epoch": 0, "source": 13, "dest": 14, "rate": {"param": 45}}
+  - {"epoch": 0, "source": 13, "dest": 18, "rate": {"param": 44}}
+  - {"epoch": 0, "source": 14, "dest": 9, "rate": {"param": 47}}
+  - {"epoch": 0, "source": 14, "dest": 13, "rate": {"param": 49}}
+  - {"epoch": 0, "source": 14, "dest": 19, "rate": {"param": 48}}
+  - {"epoch": 0, "source": 15, "dest": 10, "rate": {"param": 50}}
+  - {"epoch": 0, "source": 15, "dest": 16, "rate": {"param": 51}}
+  - {"epoch": 0, "source": 16, "dest": 11, "rate": {"param": 52}}
+  - {"epoch": 0, "source": 16, "dest": 15, "rate": {"param": 54}}
+  - {"epoch": 0, "source": 16, "dest": 17, "rate": {"param": 53}}
+  - {"epoch": 0, "source": 17, "dest": 12, "rate": {"param": 55}}
+  - {"epoch": 0, "source": 17, "dest": 16, "rate": {"param": 57}}
+  - {"epoch": 0, "source": 17, "dest": 18, "rate": {"param": 56}}
+  - {"epoch": 0, "source": 18, "dest": 13, "rate": {"param": 58}}
+  - {"epoch": 0, "source": 18, "dest": 17, "rate": {"param": 60}}
+  - {"epoch": 0, "source": 18, "dest": 19, "rate": {"param": 59}}
+  - {"epoch": 0, "source": 19, "dest": 14, "rate": {"param": 61}}
+  - {"epoch": 0, "source": 19, "dest": 18, "rate": {"param": 62}}
   parameters:
-  - ground_truth: 5.171935932074151e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 1
-  - ground_truth: 0.007841245548941916
-    lb: 1.0e-5
-    ub: 0.01
-    index: 2
-  - ground_truth: 0.0006410389337787374
-    lb: 1.0e-5
-    ub: 0.01
-    index: 3
-  - ground_truth: 8.71593110900636e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 4
-  - ground_truth: 0.0004977288008368388
-    lb: 1.0e-5
-    ub: 0.01
-    index: 5
-  - ground_truth: 0.0009414987762790531
-    lb: 1.0e-5
-    ub: 0.01
-    index: 6
-  - ground_truth: 0.004280248482251689
-    lb: 1.0e-5
-    ub: 0.01
-    index: 7
-  - ground_truth: 6.535494391138009e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 8
-  - ground_truth: 1.5420114876502724e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 9
-  - ground_truth: 0.000425028183994456
-    lb: 1.0e-5
-    ub: 0.01
-    index: 10
-  - ground_truth: 0.006992201689203382
-    lb: 1.0e-5
-    ub: 0.01
-    index: 11
-  - ground_truth: 7.706062793082981e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 12
-  - ground_truth: 0.008691324429020193
-    lb: 1.0e-5
-    ub: 0.01
-    index: 13
-  - ground_truth: 0.0014445830094055269
-    lb: 1.0e-5
-    ub: 0.01
-    index: 14
-  - ground_truth: 0.0001244441628555007
-    lb: 1.0e-5
-    ub: 0.01
-    index: 15
-  - ground_truth: 0.007453296965432761
-    lb: 1.0e-5
-    ub: 0.01
-    index: 16
-  - ground_truth: 0.008799113445489297
-    lb: 1.0e-5
-    ub: 0.01
-    index: 17
-  - ground_truth: 0.0003934024741723284
-    lb: 1.0e-5
-    ub: 0.01
-    index: 18
-  - ground_truth: 5.620547124633913e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 19
-  - ground_truth: 0.002449720226286379
-    lb: 1.0e-5
-    ub: 0.01
-    index: 20
-  - ground_truth: 4.556566498892201e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 21
-  - ground_truth: 1.0291366001813238e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 22
-  - ground_truth: 5.942718356120848e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 23
-  - ground_truth: 7.895433941807506e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 24
-  - ground_truth: 2.4655036978916396e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 25
-  - ground_truth: 5.641244988008681e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 26
-  - ground_truth: 0.0005496186797839989
-    lb: 1.0e-5
-    ub: 0.01
-    index: 27
-  - ground_truth: 0.0002442364215847237
-    lb: 1.0e-5
-    ub: 0.01
-    index: 28
-  - ground_truth: 9.039964909436815e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 29
-  - ground_truth: 0.0003099379267392234
-    lb: 1.0e-5
-    ub: 0.01
-    index: 30
-  - ground_truth: 3.5044324392258984e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 31
-  - ground_truth: 8.68977823704281e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 32
-  - ground_truth: 6.598111996737249e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 33
-  - ground_truth: 0.0001268317077344063
-    lb: 1.0e-5
-    ub: 0.01
-    index: 34
-  - ground_truth: 0.0017958472097867402
-    lb: 1.0e-5
-    ub: 0.01
-    index: 35
-  - ground_truth: 0.00511094010497419
-    lb: 1.0e-5
-    ub: 0.01
-    index: 36
-  - ground_truth: 0.0007086552427081451
-    lb: 1.0e-5
-    ub: 0.01
-    index: 37
-  - ground_truth: 0.0005339865898496273
-    lb: 1.0e-5
-    ub: 0.01
-    index: 38
-  - ground_truth: 0.000875914857887453
-    lb: 1.0e-5
-    ub: 0.01
-    index: 39
-  - ground_truth: 0.0001849463656004242
-    lb: 1.0e-5
-    ub: 0.01
-    index: 40
-  - ground_truth: 3.829076775526719e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 41
-  - ground_truth: 0.0015708319631987423
-    lb: 1.0e-5
-    ub: 0.01
-    index: 42
-  - ground_truth: 0.0003889260284959057
-    lb: 1.0e-5
-    ub: 0.01
-    index: 43
-  - ground_truth: 8.306624072392709e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 44
-  - ground_truth: 2.478789923615565e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 45
-  - ground_truth: 0.00029760232157877435
-    lb: 1.0e-5
-    ub: 0.01
-    index: 46
-  - ground_truth: 2.7152865488279057e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 47
-  - ground_truth: 7.649770462411239e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 48
-  - ground_truth: 0.006509845911451317
-    lb: 1.0e-5
-    ub: 0.01
-    index: 49
-  - ground_truth: 7.658828630610365e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 50
-  - ground_truth: 0.0011452041358598355
-    lb: 1.0e-5
-    ub: 0.01
-    index: 51
-  - ground_truth: 0.0008615563010281715
-    lb: 1.0e-5
-    ub: 0.01
-    index: 52
-  - ground_truth: 0.00937120216704011
-    lb: 1.0e-5
-    ub: 0.01
-    index: 53
-  - ground_truth: 8.688159947187885e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 54
-  - ground_truth: 0.0003343984343148916
-    lb: 1.0e-5
-    ub: 0.01
-    index: 55
-  - ground_truth: 0.0005770302974943314
-    lb: 1.0e-5
-    ub: 0.01
-    index: 56
-  - ground_truth: 6.342877075796101e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 57
-  - ground_truth: 0.0005221159409091538
-    lb: 1.0e-5
-    ub: 0.01
-    index: 58
-  - ground_truth: 0.00034622379768388265
-    lb: 1.0e-5
-    ub: 0.01
-    index: 59
-  - ground_truth: 0.0097543307299165
-    lb: 1.0e-5
-    ub: 0.01
-    index: 60
-  - ground_truth: 6.166215877718817e-05
-    lb: 1.0e-5
-    ub: 0.01
-    index: 61
-  - ground_truth: 0.0004646258648173351
-    lb: 1.0e-5
-    ub: 0.01
-    index: 62
+  - {"ground_truth": 5.171935932074151e-05, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 0.007841245548941916, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 0.0006410389337787374, "lb": 1e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 8.71593110900636e-05, "lb": 1e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 0.0004977288008368388, "lb": 1e-05, "ub": 0.01, "index": 5}
+  - {"ground_truth": 0.0009414987762790531, "lb": 1e-05, "ub": 0.01, "index": 6}
+  - {"ground_truth": 0.004280248482251689, "lb": 1e-05, "ub": 0.01, "index": 7}
+  - {"ground_truth": 6.535494391138009e-05, "lb": 1e-05, "ub": 0.01, "index": 8}
+  - {"ground_truth": 1.5420114876502724e-05, "lb": 1e-05, "ub": 0.01, "index": 9}
+  - {"ground_truth": 0.000425028183994456, "lb": 1e-05, "ub": 0.01, "index": 10}
+  - {"ground_truth": 0.006992201689203382, "lb": 1e-05, "ub": 0.01, "index": 11}
+  - {"ground_truth": 7.706062793082981e-05, "lb": 1e-05, "ub": 0.01, "index": 12}
+  - {"ground_truth": 0.008691324429020193, "lb": 1e-05, "ub": 0.01, "index": 13}
+  - {"ground_truth": 0.0014445830094055269, "lb": 1e-05, "ub": 0.01, "index": 14}
+  - {"ground_truth": 0.0001244441628555007, "lb": 1e-05, "ub": 0.01, "index": 15}
+  - {"ground_truth": 0.007453296965432761, "lb": 1e-05, "ub": 0.01, "index": 16}
+  - {"ground_truth": 0.008799113445489297, "lb": 1e-05, "ub": 0.01, "index": 17}
+  - {"ground_truth": 0.0003934024741723284, "lb": 1e-05, "ub": 0.01, "index": 18}
+  - {"ground_truth": 5.620547124633913e-05, "lb": 1e-05, "ub": 0.01, "index": 19}
+  - {"ground_truth": 0.002449720226286379, "lb": 1e-05, "ub": 0.01, "index": 20}
+  - {"ground_truth": 4.556566498892201e-05, "lb": 1e-05, "ub": 0.01, "index": 21}
+  - {"ground_truth": 1.0291366001813238e-05, "lb": 1e-05, "ub": 0.01, "index": 22}
+  - {"ground_truth": 5.942718356120848e-05, "lb": 1e-05, "ub": 0.01, "index": 23}
+  - {"ground_truth": 7.895433941807506e-05, "lb": 1e-05, "ub": 0.01, "index": 24}
+  - {"ground_truth": 2.4655036978916396e-05, "lb": 1e-05, "ub": 0.01, "index": 25}
+  - {"ground_truth": 5.641244988008681e-05, "lb": 1e-05, "ub": 0.01, "index": 26}
+  - {"ground_truth": 0.0005496186797839989, "lb": 1e-05, "ub": 0.01, "index": 27}
+  - {"ground_truth": 0.0002442364215847237, "lb": 1e-05, "ub": 0.01, "index": 28}
+  - {"ground_truth": 9.039964909436815e-05, "lb": 1e-05, "ub": 0.01, "index": 29}
+  - {"ground_truth": 0.0003099379267392234, "lb": 1e-05, "ub": 0.01, "index": 30}
+  - {"ground_truth": 3.5044324392258984e-05, "lb": 1e-05, "ub": 0.01, "index": 31}
+  - {"ground_truth": 8.68977823704281e-05, "lb": 1e-05, "ub": 0.01, "index": 32}
+  - {"ground_truth": 6.598111996737249e-05, "lb": 1e-05, "ub": 0.01, "index": 33}
+  - {"ground_truth": 0.0001268317077344063, "lb": 1e-05, "ub": 0.01, "index": 34}
+  - {"ground_truth": 0.0017958472097867402, "lb": 1e-05, "ub": 0.01, "index": 35}
+  - {"ground_truth": 0.00511094010497419, "lb": 1e-05, "ub": 0.01, "index": 36}
+  - {"ground_truth": 0.0007086552427081451, "lb": 1e-05, "ub": 0.01, "index": 37}
+  - {"ground_truth": 0.0005339865898496273, "lb": 1e-05, "ub": 0.01, "index": 38}
+  - {"ground_truth": 0.000875914857887453, "lb": 1e-05, "ub": 0.01, "index": 39}
+  - {"ground_truth": 0.0001849463656004242, "lb": 1e-05, "ub": 0.01, "index": 40}
+  - {"ground_truth": 3.829076775526719e-05, "lb": 1e-05, "ub": 0.01, "index": 41}
+  - {"ground_truth": 0.0015708319631987423, "lb": 1e-05, "ub": 0.01, "index": 42}
+  - {"ground_truth": 0.0003889260284959057, "lb": 1e-05, "ub": 0.01, "index": 43}
+  - {"ground_truth": 8.306624072392709e-05, "lb": 1e-05, "ub": 0.01, "index": 44}
+  - {"ground_truth": 2.478789923615565e-05, "lb": 1e-05, "ub": 0.01, "index": 45}
+  - {"ground_truth": 0.00029760232157877435, "lb": 1e-05, "ub": 0.01, "index": 46}
+  - {"ground_truth": 2.7152865488279057e-05, "lb": 1e-05, "ub": 0.01, "index": 47}
+  - {"ground_truth": 7.649770462411239e-05, "lb": 1e-05, "ub": 0.01, "index": 48}
+  - {"ground_truth": 0.006509845911451317, "lb": 1e-05, "ub": 0.01, "index": 49}
+  - {"ground_truth": 7.658828630610365e-05, "lb": 1e-05, "ub": 0.01, "index": 50}
+  - {"ground_truth": 0.0011452041358598355, "lb": 1e-05, "ub": 0.01, "index": 51}
+  - {"ground_truth": 0.0008615563010281715, "lb": 1e-05, "ub": 0.01, "index": 52}
+  - {"ground_truth": 0.00937120216704011, "lb": 1e-05, "ub": 0.01, "index": 53}
+  - {"ground_truth": 8.688159947187885e-05, "lb": 1e-05, "ub": 0.01, "index": 54}
+  - {"ground_truth": 0.0003343984343148916, "lb": 1e-05, "ub": 0.01, "index": 55}
+  - {"ground_truth": 0.0005770302974943314, "lb": 1e-05, "ub": 0.01, "index": 56}
+  - {"ground_truth": 6.342877075796101e-05, "lb": 1e-05, "ub": 0.01, "index": 57}
+  - {"ground_truth": 0.0005221159409091538, "lb": 1e-05, "ub": 0.01, "index": 58}
+  - {"ground_truth": 0.00034622379768388265, "lb": 1e-05, "ub": 0.01, "index": 59}
+  - {"ground_truth": 0.0097543307299165, "lb": 1e-05, "ub": 0.01, "index": 60}
+  - {"ground_truth": 6.166215877718817e-05, "lb": 1e-05, "ub": 0.01, "index": 61}
+  - {"ground_truth": 0.0004646258648173351, "lb": 1e-05, "ub": 0.01, "index": 62}
+epochTimeSplit:
+populationConversion:

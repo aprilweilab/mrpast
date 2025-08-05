@@ -1,99 +1,50 @@
-# OutOfAfrica_3G09 from stdpopsim, converted from the Demes model that was exported
-# from stdpopsim. From Gutenkunst et al., 2009
-# Variant: the epoch times are essentially fixed (tightly bounded).
 ploidy: 2
+pop_count: 3
 pop_names:
 - YRI
 - CEU
 - CHB
 coalescence:
-  vectors:
-  - [2, 4, 5]
-  - [2, 3, 0]
-  - [2, 0, 0]
-  - [1, 0, 0]
+  entries:
+  - {"epoch": 0, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": 1, "rate": {"param": 4}}
+  - {"epoch": 0, "deme": 2, "rate": {"param": 5}}
+  - {"epoch": 1, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 1, "deme": 1, "rate": {"param": 3}}
+  - {"epoch": 2, "deme": 0, "rate": {"param": 2}}
+  - {"epoch": 3, "deme": 0, "rate": {"param": 1}}
   parameters:
-  - ground_truth: 6.84931506849315e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 1
-  - ground_truth: 4.065040650406504e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 2
-  - ground_truth: 0.0002380952380952381
-    lb: 1.0e-06
-    ub: 0.01
-    index: 3
-  - ground_truth: 1.682066345910231e-05
-    lb: 1.0e-06
-    ub: 0.01
-    index: 4
-  - ground_truth: 9.243796257772543e-06
-    lb: 1.0e-06
-    ub: 0.01
-    index: 5
-migration:
-  matrices:
-  - - [0, 2, 3]
-    - [2, 0, 4]
-    - [3, 4, 0]
-  - - [0, 1, 0]
-    - [1, 0, 0]
-    - [0, 0, 0]
-  - - [0, 0, 0]
-    - [0, 0, 0]
-    - [0, 0, 0]
-  - - [0, 0, 0]
-    - [0, 0, 0]
-    - [0, 0, 0]
-  parameters:
-  - ground_truth: 0.00025
-    lb: 1.0e-05
-    ub: 0.01
-    index: 1
-  - ground_truth: 3.0e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 2
-  - ground_truth: 1.9e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 3
-  - ground_truth: 9.6e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 4
+  - {"ground_truth": 6.84931506849315e-05, "lb": 1e-06, "ub": 0.01, "index": 1}
+  - {"ground_truth": 4.065040650406504e-05, "lb": 1e-06, "ub": 0.01, "index": 2}
+  - {"ground_truth": 0.0002380952380952381, "lb": 1e-06, "ub": 0.01, "index": 3}
+  - {"ground_truth": 1.682066345910231e-05, "lb": 1e-06, "ub": 0.01, "index": 4}
+  - {"ground_truth": 9.243796257772543e-06, "lb": 1e-06, "ub": 0.01, "index": 5}
 growth:
-  vectors:
-  - [0, 1, 2]
-  - [0, 0, 0]
-  - [0, 0, 0]
-  - [0, 0, 0]
+  entries:
+  - {"epoch": 0, "deme": 1, "rate": {"param": 1}}
+  - {"epoch": 0, "deme": 2, "rate": {"param": 2}}
   parameters:
-  - ground_truth: 0.004
-    lb: 0.001
-    ub: 0.05
-    index: 1
-  - ground_truth: 0.0055
-    lb: 0.001
-    ub: 0.05
-    index: 2
-# Notice how the lower/upper bounds for these epochs partition the time axis. This is important
-# to avoid a solution where an older epoch gets a time earlier than a newer epoch.
+  - {"ground_truth": 0.004, "lb": 0.001, "ub": 0.05, "index": 1}
+  - {"ground_truth": 0.0055, "lb": 0.001, "ub": 0.05, "index": 2}
+migration:
+  entries:
+  - {"epoch": 0, "source": 0, "dest": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "source": 0, "dest": 2, "rate": {"param": 3}}
+  - {"epoch": 0, "source": 1, "dest": 0, "rate": {"param": 2}}
+  - {"epoch": 0, "source": 1, "dest": 2, "rate": {"param": 4}}
+  - {"epoch": 0, "source": 2, "dest": 0, "rate": {"param": 3}}
+  - {"epoch": 0, "source": 2, "dest": 1, "rate": {"param": 4}}
+  - {"epoch": 1, "source": 0, "dest": 1, "rate": {"param": 1}}
+  - {"epoch": 1, "source": 1, "dest": 0, "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 0.00025, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 3e-05, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 1.9e-05, "lb": 1e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 9.6e-05, "lb": 1e-05, "ub": 0.01, "index": 4}
 epochTimeSplit:
-- ground_truth: 848.0
-  lb: 847.0
-  ub: 849.0
-  index: 1
-- ground_truth: 5600.0
-  lb: 5599.0
-  ub: 5601.0
-  index: 2
-- ground_truth: 8800.0
-  lb: 8799.0
-  ub: 8801.0
-  index: 3
+- {"ground_truth": 848.0, "lb": 847.0, "ub": 849.0, "index": 1}
+- {"ground_truth": 5600.0, "lb": 5599.0, "ub": 5601.0, "index": 2}
+- {"ground_truth": 8800.0, "lb": 8799.0, "ub": 8801.0, "index": 3}
 populationConversion:
 - [0, 1, 1]
 - [0, 0, 0]
