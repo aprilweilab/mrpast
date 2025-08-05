@@ -86,10 +86,13 @@ struct BoundedVariable {
     double init;
     double lb;
     double ub;
-    std::list<VariableApplication> applications;
+    std::vector<VariableApplication> applications;
     std::string description;
     double ground_truth;
+    size_t kind_index;
 };
+
+inline bool isJsonParamFixed(const json& parameter) { return (parameter["lb"] == parameter["ub"]); }
 
 /**
  * The schema describes the parameters, their bounds, and how they apply to the

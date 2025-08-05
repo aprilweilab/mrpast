@@ -63,6 +63,95 @@ class FloatParameter:
     index: int
 
 
+@dataclass_json
+@dataclass
+class VariableApplication:
+    """
+    An application of a variable to a matrix. This is interpreted as:
+      M[i, j] += (coeff * variable)
+    In this way variables can be reused across a matrix when there is dependence between cells.
+    """
+
+    epoch: int
+    i: int
+    j: int
+    coeff: float
+    adjustment: Optional[TimeSliceAdjustment] = None
+
+
+@dataclass_json
+@dataclass
+class BoundedVariable:
+    """
+    Initial value with boundary constraints
+    """
+
+    init: float
+    lb: float
+    ub: float
+    kind: str
+    kind_index: int
+    apply_to: List[VariableApplication] = field(default_factory=list)
+    description: str = ""
+    ground_truth: Optional[float] = None
+    final: Optional[float] = None
+
+    @staticmethod
+    def from_float_value(
+        value: float,
+        kind: str,
+        kind_index: int,
+        desc: str = "",
+    ) -> "BoundedVariable":
+        return BoundedVariable(
+            init=value,
+            lb=value,
+            ub=value,
+            kind=kind,
+            kind_index=kind_index,
+            description=desc,
+            ground_truth=value,
+        )
+
+    @staticmethod
+    def from_float_parameter(
+        param: FloatParameter,
+        kind: str,
+        kind_index: int,
+        init_random: bool = True,
+        desc: str = "",
+    ) -> "BoundedVariable":
+        if param.lb != param.ub and init_random:
+            init = random.uniform(param.lb, param.ub)
+        else:
+            init = param.ground_truth
+        return BoundedVariable(
+            init=init,
+            lb=param.lb,
+            ub=param.ub,
+            kind=kind,
+            kind_index=kind_index,
+            description=desc,
+            ground_truth=param.ground_truth,
+        )
+
+    @property
+    def is_fixed(self):
+        return self.lb == self.ub
+
+    def randomize(self) -> "BoundedVariable":
+        return BoundedVariable(
+            init=random.uniform(self.lb, self.ub) if not self.is_fixed else self.init,
+            lb=self.lb,
+            ub=self.ub,
+            kind=self.kind,
+            kind_index=self.kind_index,
+            apply_to=self.apply_to,
+            description=self.description,
+            ground_truth=self.ground_truth,
+        )
+
+
 DemePairIndex = Dict[Tuple[int, int], int]
 
 
@@ -139,13 +228,13 @@ class DemeRateEntry(ResolveableEntry):
 
 @dataclass
 class ParamContainer:
-    def get_parameter(self, param_idx: int) -> Optional[FloatParameter]:
+    def get_parameter(self, param_idx: int) -> FloatParameter:
         assert hasattr(self, "parameters")
         assert param_idx > 0
         for p in self.parameters:
             if p.index == param_idx:
                 return p
-        return None
+        assert False, f"Parameter index {param_idx} not found"
 
     def resolve_names(self, name2index: Dict[str, int]):
         assert hasattr(self, "entries")
@@ -201,6 +290,27 @@ class DemeDemeRates(ParamContainer):
                 return e
         return None
 
+    def get_sim_value(self, epoch: int, source: int, dest: int) -> Optional[float]:
+        entry = self.get_entry(epoch, source, dest)
+        if entry is None:
+            return None
+        if isinstance(entry.rate, ParamRef):
+            return self.get_parameter(entry.rate.param).ground_truth
+        return float(entry.rate)
+
+    def get_index_or_value(
+        self, epoch: int, source: int, dest: int
+    ) -> Tuple[Optional[int], Optional[float]]:
+        """
+        Return the parameter index and converted bounded variable for this
+        """
+        entry = self.get_entry(epoch, source, dest)
+        if entry is None:
+            return (None, None)
+        if isinstance(entry.rate, ParamRef):
+            return (entry.rate.param, None)
+        return (None, float(entry.rate))
+
     @staticmethod
     def from_config(config_entry: Dict[str, Any]) -> "DemeDemeRates":
         return ParamContainer._from_config(config_entry, DemeDemeEntry, DemeDemeRates)
@@ -226,6 +336,27 @@ class DemeRates(ParamContainer):
             if e.epoch == epoch and e.deme == deme:
                 return e
         return None
+
+    def get_sim_value(self, epoch: int, deme: int) -> Optional[float]:
+        entry = self.get_entry(epoch, deme)
+        if entry is None:
+            return None
+        if isinstance(entry.rate, ParamRef):
+            return self.get_parameter(entry.rate.param).ground_truth
+        return float(entry.rate)
+
+    def get_index_or_value(
+        self, epoch: int, deme: int
+    ) -> Tuple[Optional[int], Optional[float]]:
+        """
+        Return the parameter index and converted bounded variable for this
+        """
+        entry = self.get_entry(epoch, deme)
+        if entry is None:
+            return (None, None)
+        if isinstance(entry.rate, ParamRef):
+            return (entry.rate.param, None)
+        return (None, float(entry.rate))
 
     @staticmethod
     def from_config(config_entry: Dict[str, Any]) -> "DemeRates":
@@ -353,74 +484,6 @@ class UserModel:
         )
 
 
-@dataclass_json
-@dataclass
-class VariableApplication:
-    """
-    An application of a variable to a matrix. This is interpreted as:
-      M[i, j] += (coeff * variable)
-    In this way variables can be reused across a matrix when there is dependence between cells.
-    """
-
-    epoch: int
-    i: int
-    j: int
-    coeff: float
-    adjustment: Optional[TimeSliceAdjustment] = None
-
-
-@dataclass_json
-@dataclass
-class BoundedVariable:
-    """
-    Initial value with boundary constraints
-    """
-
-    init: float
-    lb: float
-    ub: float
-    kind: str
-    kind_index: int
-    apply_to: List[VariableApplication] = field(default_factory=list)
-    description: str = ""
-    ground_truth: Optional[float] = None
-    final: Optional[float] = None
-
-    @staticmethod
-    def from_float_parameter(
-        param: FloatParameter,
-        kind: str,
-        kind_index: int,
-        init_random: bool = True,
-        desc: str = "",
-    ) -> "BoundedVariable":
-        if init_random:
-            init = random.uniform(param.lb, param.ub)
-        else:
-            init = param.ground_truth
-        return BoundedVariable(
-            init=init,
-            lb=param.lb,
-            ub=param.ub,
-            kind=kind,
-            kind_index=kind_index,
-            description=desc,
-            ground_truth=param.ground_truth,
-        )
-
-    def randomize(self) -> "BoundedVariable":
-        return BoundedVariable(
-            init=random.uniform(self.lb, self.ub),
-            lb=self.lb,
-            ub=self.ub,
-            kind=self.kind,
-            kind_index=self.kind_index,
-            apply_to=self.apply_to,
-            description=self.description,
-            ground_truth=self.ground_truth,
-        )
-
-
 # Instead of enforcing that here with parameter applications, the solver enforces that later.
 def construct_stoch_matrix(
     model: UserModel,
@@ -437,30 +500,41 @@ def construct_stoch_matrix(
     deme_pair_index = model.get_pair_ordering()
     nstates = len(set(deme_pair_index.values()))
 
+    def notnone(*pair) -> bool:
+        return (pair[0] is not None) or (pair[1] is not None)
+
+    fixed_mig_params = []
+    fixed_coal_params = []
+    fixed_grow_params = []
+
     # Add symbolic state transitions for moving between demes.
     # We are moving an individual from i->j
     for i in range(model.num_demes):
         for j in range(model.num_demes):
-            m_param_entry = model.migration.get_entry(epoch, i, j)
-            if m_param_entry is not None:
-                assert isinstance(m_param_entry.rate, ParamRef)
-                migration_param_idx = m_param_entry.rate.param
+            m_index, m_value = model.migration.get_index_or_value(epoch, i, j)
+            if notnone(m_index, m_value):
                 assert i != j, f"Migration to self is not allowed (deme {i})"
-                parameter = model.migration.get_parameter(migration_param_idx)
-                assert parameter is not None
-                # Migration rate is a variable to be optimized. The actual stochastic state transition rates
-                # are derived from these by a linear combination.
-                if migration_param_idx not in M_parameters:
-                    M_parameters[migration_param_idx] = (
-                        BoundedVariable.from_float_parameter(
-                            parameter,
+                if m_index is not None:
+                    # Migration rate is a variable to be optimized. The actual stochastic state transition rates
+                    # are derived from these by a linear combination.
+                    if m_index not in M_parameters:
+                        M_parameters[m_index] = BoundedVariable.from_float_parameter(
+                            model.migration.get_parameter(m_index),
                             ParameterKind.PARAM_KIND_MIGRATION,
-                            int(migration_param_idx),
+                            int(m_index),
                             not init_from_ground_truth,
-                            desc=f"Migration rate from {i}->{j}",
+                            desc=f"Migration rate from {model.pop_names[i]}->{model.pop_names[j]}",
                         )
+                    migrate_boundedvar = M_parameters[m_index]
+                else:
+                    assert m_value is not None
+                    migrate_boundedvar = BoundedVariable.from_float_value(
+                        m_value,
+                        ParameterKind.PARAM_KIND_MIGRATION,
+                        -1,
+                        desc=f"Fixed migration rate from {model.pop_names[i]}->{model.pop_names[j]}",
                     )
-                migrate_boundedvar = M_parameters[migration_param_idx]
+                    fixed_mig_params.append(migrate_boundedvar)
 
                 # The second individual stays at k, for all possible k values.
                 for k in range(model.num_demes):
@@ -482,24 +556,29 @@ def construct_stoch_matrix(
 
     # Add symbolic state transitions for the coalescent states
     for i in range(model.num_demes):
-        c_param_entry = model.coalescence.get_entry(epoch, i)
-        if c_param_entry is not None:
-            assert isinstance(c_param_entry.rate, ParamRef)
-            coal_param_idx = c_param_entry.rate.param
-            parameter = model.coalescence.get_parameter(coal_param_idx)
-            assert parameter is not None
-
-            # Coalescence rate is a variable to be optimized. The actual stochastic state transition rates
-            # are derived from these by a linear combination.
-            if coal_param_idx not in Q_parameters:
-                Q_parameters[coal_param_idx] = BoundedVariable.from_float_parameter(
-                    parameter,
+        c_index, c_value = model.coalescence.get_index_or_value(epoch, i)
+        if notnone(c_index, c_value):
+            if c_index is not None:
+                # Coalescence rate is a variable to be optimized. The actual stochastic state transition rates
+                # are derived from these by a linear combination.
+                if c_index not in Q_parameters:
+                    Q_parameters[c_index] = BoundedVariable.from_float_parameter(
+                        model.coalescence.get_parameter(c_index),
+                        ParameterKind.PARAM_KIND_COAL,
+                        int(c_index),
+                        not init_from_ground_truth,
+                        desc=f"Coalescence rate for deme {model.pop_names[i]}",
+                    )
+                coalesce_boundedvar = Q_parameters[c_index]
+            else:
+                assert c_value is not None
+                coalesce_boundedvar = BoundedVariable.from_float_value(
+                    c_value,
                     ParameterKind.PARAM_KIND_COAL,
-                    int(coal_param_idx),
-                    not init_from_ground_truth,
-                    desc=f"Coalescence rate for deme {i}",
+                    -1,
+                    desc=f"Fixed coalescence rate for deme {model.pop_names[i]}",
                 )
-            coalesce_boundedvar = Q_parameters[coal_param_idx]
+                fixed_coal_params.append(coalesce_boundedvar)
 
             # Coalescence state can only be reached from the state where both individuals are in the same deme.
             from_idx = deme_pair_index[i, i]
@@ -510,23 +589,27 @@ def construct_stoch_matrix(
 
             # Optional growth-rate adjustment the coalescent rate. At discretized time t, the adjustment
             # to the coalescent rate is 1/e^{-alpha*t}, where alpha is defined per-deme.
-            g_param_entry = model.growth.get_entry(epoch, i)
-            if g_param_entry is not None:
-                assert isinstance(g_param_entry.rate, ParamRef)
-                growth_param_idx = g_param_entry.rate.param
-                if growth_param_idx not in G_parameters:
-                    growth_param = model.growth.get_parameter(growth_param_idx)
-                    assert growth_param is not None
-                    G_parameters[growth_param_idx] = (
-                        BoundedVariable.from_float_parameter(
-                            growth_param,
+            g_index, g_value = model.growth.get_index_or_value(epoch, i)
+            if notnone(g_index, g_value):
+                if g_index is not None:
+                    if g_index not in G_parameters:
+                        G_parameters[g_index] = BoundedVariable.from_float_parameter(
+                            model.growth.get_parameter(g_index),
                             ParameterKind.PARAM_KIND_GROWTH,
-                            int(growth_param_idx),
+                            int(g_index),
                             not init_from_ground_truth,
-                            desc=f"Growth rate for deme {i}",
+                            desc=f"Growth rate for deme {model.pop_names[i]}",
                         )
+                    growth_boundedvar = G_parameters[g_index]
+                else:
+                    assert g_value is not None
+                    growth_boundedvar = BoundedVariable.from_float_value(
+                        g_value,
+                        ParameterKind.PARAM_KIND_GROWTH,
+                        -1,
+                        desc=f"Fixed growth rate for deme {model.pop_names[i]}",
                     )
-                growth_boundedvar = G_parameters[growth_param_idx]
+                    fixed_grow_params.append(growth_boundedvar)
                 # We apply the growth to both the "coalescence" and "stay put" cases, because they should be
                 # symmetric for the Q-matrix to work properly.
                 growth_boundedvar.apply_to.append(
@@ -538,6 +621,15 @@ def construct_stoch_matrix(
                         adjustment=TimeSliceAdjustment.GROWTH_RATE,
                     )
                 )
+
+    def add_fixed(param_dict, fixed_list):
+        next_i = max(param_dict.keys()) + 1
+        for i in range(len(fixed_list)):
+            param_dict[next_i + i] = fixed_list[i]
+
+    add_fixed(M_parameters, fixed_mig_params)
+    add_fixed(Q_parameters, fixed_coal_params)
+    add_fixed(G_parameters, fixed_grow_params)
 
 
 # This assumes that all the population conversion matrices are written in terms of epoch0, instead

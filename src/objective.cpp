@@ -38,15 +38,6 @@ using Eigen::VectorXd;
 // Turn this on and recompile, to track down numerical problems.
 #define TRACE_MATRICES 0
 
-// Flags that affect how we approximate the application of the growth rate.
-// Use the average coalescence rate from start of epoch to time T_k. The smaller T_k is, the
-// more accurate this will be.
-#define USE_AVG_COAL_RATE 1
-// Use the the actual coalescence rate at time T_k, which will be the largest rate. This over-
-// approximates the rate and under-approximates the Ne over T_k. When T_k is large, the coal
-// rate is large (Ne is small), and this will _really_ over-approximate.
-#define USE_OVER_APPROX_COAL_RATE 0
-
 // When computing probabilities in multi-epoch models, this uses the additive probability rule
 // P(A or B) = P(A) + P(B) - P(A and B), instead of negating all of the probabilities to only
 // use P(not(A) and not(B)). The former results in fewer subtractions, which anecdotally appears
@@ -161,21 +152,24 @@ void ParameterSchema::load(const json& inputData) {
         if (parameter.contains("ground_truth")) {
             ground_truth = parameter["ground_truth"];
         }
-        BoundedVariable bv = {
-            parameter["init"], parameter["lb"], parameter["ub"], {}, parameter["description"], ground_truth};
-        const bool isFixed = parameter.contains("fixed") && (bool)parameter["fixed"];
-        if (isFixed) {
+        BoundedVariable bv = {parameter["init"],
+                              parameter["lb"],
+                              parameter["ub"],
+                              {},
+                              parameter["description"],
+                              ground_truth,
+                              parameter["kind_index"]};
+        if (isJsonParamFixed(parameter)) {
             m_eFixed.push_back(std::move(bv));
         } else {
             m_eParams.push_back(std::move(bv));
             m_paramRescale.emplace_back(EPOCH_TIME_RESCALE);
         }
     }
-    RELEASE_ASSERT(m_eParams.empty() || m_eFixed.empty()); // Only all fixed or all params
     m_numEpochs = m_eParams.size() + m_eFixed.size() + 1;
     m_sStates = std::vector<size_t>(m_numEpochs);
     for (const auto& parameter : inputData.at(SMATRIX_VALS_KEY)) {
-        std::list<VariableApplication> applications;
+        std::vector<VariableApplication> applications;
         const auto& applyTo = parameter["apply_to"];
         assert(!applyTo.empty());
         for (const auto& app : applyTo) {
@@ -202,8 +196,7 @@ void ParameterSchema::load(const json& inputData) {
                               std::move(applications),
                               parameter["description"],
                               ground_truth};
-        const bool isFixed = parameter.contains("fixed") && (bool)parameter["fixed"];
-        if (isFixed) {
+        if (isJsonParamFixed(parameter)) {
             m_sFixed.push_back(std::move(bv));
         } else {
             m_sParams.push_back(std::move(bv));
@@ -258,16 +251,18 @@ void ParameterSchema::getBounds(size_t paramIdx, double& lowerBound, double& upp
 
 double ParameterSchema::getEpochStartTime(double const* parameters, size_t epoch) const {
     assert(epoch < m_numEpochs);
-    double epochTime = 0.0;
     if (epoch > 0) {
-        const size_t paramIdx = epoch - 1;
-        if (!m_eParams.empty()) {
-            epochTime = fromParam(parameters[paramIdx], paramIdx);
-        } else {
-            epochTime = m_eFixed.at(paramIdx).init;
+        const size_t epochIndex = epoch - 1;
+        for (size_t i = 0; i < m_eParams.size(); i++) {
+            if (m_eParams[i].kind_index == epochIndex) {
+                return fromParam(parameters[i], i);
+            }
+        }
+        for (size_t i = 0; i < m_eFixed.size(); i++) {
+            return m_eFixed[i].init;
         }
     }
-    return epochTime;
+    return 0.0;
 }
 
 json ParameterSchema::toJsonOutput(const double* parameters, const double negLL) const {
@@ -276,19 +271,31 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
     size_t p = 0;
     RELEASE_ASSERT(output.at(EPOCH_TIMES_KEY).size() == m_eParams.size() + m_eFixed.size());
     for (auto& parameter : output.at(EPOCH_TIMES_KEY)) {
-        if (!m_eParams.empty()) {
-            parameter["final"] = fromParam(parameters[p], p);
-            p++;
-        } else {
+        if (isJsonParamFixed(parameter)) {
             parameter["final"] = m_eFixed.at(e).init;
             e++;
+        } else {
+            parameter["final"] = fromParam(parameters[p], p);
+            p++;
         }
     }
-    RELEASE_ASSERT(output.at(SMATRIX_VALS_KEY).size() == m_sParams.size());
+    RELEASE_ASSERT(e == m_eFixed.size());
+    RELEASE_ASSERT(p == m_eParams.size());
+    RELEASE_ASSERT(output.at(SMATRIX_VALS_KEY).size() == m_sParams.size() + m_sFixed.size());
+    size_t s = 0;
     for (auto& parameter : output.at(SMATRIX_VALS_KEY)) {
-        parameter["final"] = fromParam(parameters[p], p);
-        p++;
+        const size_t smIndex = (p - m_eParams.size());
+        if (isJsonParamFixed(parameter)) {
+            parameter["final"] = m_sFixed.at(s).init;
+            s++;
+        } else {
+            RELEASE_ASSERT(smIndex < m_sParams.size());
+            parameter["final"] = fromParam(parameters[p], p);
+            p++;
+        }
     }
+    RELEASE_ASSERT(s == m_sFixed.size());
+    RELEASE_ASSERT((p - m_eParams.size()) == m_sParams.size());
     output["negLL"] = negLL;
     return std::move(output);
 }
@@ -296,16 +303,14 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
 void ParameterSchema::fromJsonOutput(const json& jsonOutput, double* parameters, std::string key) const {
     size_t p = 0;
     for (const auto& paramVal : jsonOutput[EPOCH_TIMES_KEY]) {
-        const bool isFixed = paramVal.contains("fixed") && (bool)paramVal["fixed"];
-        if (!isFixed) {
+        if (!isJsonParamFixed(paramVal)) {
             parameters[p] = toParam((double)paramVal[key], p);
             p++;
         }
     }
     RELEASE_ASSERT(m_eParams.size() == p);
     for (const auto& paramVal : jsonOutput[SMATRIX_VALS_KEY]) {
-        const bool isFixed = paramVal.contains("fixed") && (bool)paramVal["fixed"];
-        if (!isFixed) {
+        if (!isJsonParamFixed(paramVal)) {
             parameters[p] = toParam((double)paramVal[key], p);
             p++;
         }
@@ -322,52 +327,45 @@ MatrixXd
 createQMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch, const double timeSinceEpochStart) {
     assert(epoch < schema.numEpochs());
 
-    bool anyAdjusted = false;
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch));
     // Skip this many epoch transition times.
-    size_t firstParamIdx = schema.m_eParams.size();
+    const size_t firstParamIdx = schema.m_eParams.size();
     MatrixXd qMatrix = MatrixXd::Zero(nStates, nStates);
+
+    auto applyParameter =
+        [&](const std::vector<VariableApplication>& applications, const double parameterValue, bool& anyAdjusted) {
+            for (const auto& application : applications) {
+                if (application.epoch == epoch) {
+                    const Eigen::Index i = SIZE_T_TO_INDEX(application.i);
+                    const Eigen::Index j = SIZE_T_TO_INDEX(application.j);
+                    // Adjustments always come last. See model.py
+                    if (application.adjust == ADJUST_GROWTH_RATE) {
+                        const double origRate = qMatrix(i, j);
+                        // The integral on interval {0, u} is (1/a - exp(-a*u)/a)
+                        // we can divide by alpha to get the average rate over time period lower:upper.
+                        const double integratedRate = (std::exp(parameterValue * timeSinceEpochStart) - 1) /
+                                                      (parameterValue * timeSinceEpochStart);
+                        qMatrix(i, j) = origRate * integratedRate * application.coeff;
+                        anyAdjusted = true;
+                    } else if (application.adjust == ADJUST_INV_GROWTH_RATE) {
+                        // For backwards compatibility with JSON input files. Just ignore.
+                    } else {
+                        qMatrix(i, j) += parameterValue * application.coeff;
+                        assert(!anyAdjusted);
+                    }
+                }
+            }
+        };
+
+    // Apply the non-parameters first.
+    bool anyAdjusted = false;
+    for (const auto& param : schema.m_sFixed) {
+        applyParameter(param.applications, param.init, anyAdjusted);
+    }
     for (size_t p = 0; p < schema.m_sParams.size(); p++) {
         const size_t paramIdx = firstParamIdx + p;
         double pVal = schema.fromParam(parameters[paramIdx], paramIdx);
-        for (const auto& application : schema.m_sParams[p].applications) {
-            if (application.epoch == epoch) {
-                const Eigen::Index i = SIZE_T_TO_INDEX(application.i);
-                const Eigen::Index j = SIZE_T_TO_INDEX(application.j);
-                // Adjustments always come last. See model.py
-                if (application.adjust == ADJUST_GROWTH_RATE) {
-                    const double origRate = qMatrix(i, j);
-#if USE_AVG_COAL_RATE
-                    // The integral on interval {0, u} is (1/a - exp(-a*u)/a)
-                    // we can divide by alpha to get the average rate over time period lower:upper.
-                    const double integratedRate =
-                        (std::exp(pVal * timeSinceEpochStart) - 1) / (pVal * timeSinceEpochStart);
-                    qMatrix(i, j) = origRate * integratedRate * application.coeff;
-#elif USE_OVER_APPROX_COAL_RATE
-                    // rateB = base_rate * math.exp(r_EU * i)
-                    qMatrix(i, j) = origRate * std::exp(pVal * timeSinceEpochStart) * application.coeff;
-                    // std::cout << "OrigRate = " << origRate << ", NewRate = " << qMatrix(i, j) << "\n";
-#else
-                    static_assert(false, "Invalid preprocessor definition combination");
-#endif
-                    anyAdjusted = true;
-                } else if (application.adjust == ADJUST_INV_GROWTH_RATE) {
-                    // For backwards compatibility with JSON input files. Just ignore.
-                } else {
-                    qMatrix(i, j) += pVal * application.coeff;
-                    assert(!anyAdjusted);
-                }
-            }
-        }
-    }
-    for (const auto& param : schema.m_sFixed) {
-        for (const auto& application : param.applications) {
-            if (application.epoch == epoch) {
-                const Eigen::Index i = SIZE_T_TO_INDEX(application.i);
-                const Eigen::Index j = SIZE_T_TO_INDEX(application.j);
-                qMatrix(i, j) += param.init * application.coeff;
-            }
-        }
+        applyParameter(schema.m_sParams[p].applications, pVal, anyAdjusted);
     }
     // Sum the off-diagonal and set the diagonal to the negative sum. This makes a valid
     // Q-matrix.

@@ -24,7 +24,7 @@ import os
 from mrpast.helpers import (
     load_ratemap,
 )
-from mrpast.model import UserModel, ParamRef
+from mrpast.model import UserModel
 
 
 def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[int]]:
@@ -63,33 +63,26 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
     for i in range(num_pops):
         initially_active = False
         size = None
+        rate_value = None
         for epoch in range(num_epochs):
             # ne = 1 / (lambda * ploidy)
-            rate_entry = user_model.coalescence.get_entry(epoch, i)
-            if rate_entry is not None:
-                assert isinstance(rate_entry.rate, ParamRef)
-                rate_param = user_model.coalescence.get_parameter(rate_entry.rate.param)
+            rate_value = user_model.coalescence.get_sim_value(epoch, i)
+            if rate_value is not None:
                 if epoch == 0:
                     initially_active = True
                     active_pops.append(i)
-                size = Ne_from_coal_rate(rate_param.ground_truth)
+                size = Ne_from_coal_rate(rate_value)
                 break
         assert (
-            rate_param is not None
+            rate_value is not None
         ), "Every population must have at least one epoch with a coalescent rate"
-        growth_rate = None
-        grow_entry = user_model.growth.get_entry(epoch, i)
-        if grow_entry is not None:
-            assert isinstance(grow_entry.rate, ParamRef)
-            grate_param = user_model.growth.get_parameter(grow_entry.rate.param)
-            growth_rate = grate_param.ground_truth
+        growth_rate = user_model.growth.get_sim_value(epoch, i)
         demography.add_population(
             initial_size=size,
             initially_active=initially_active,
-            growth_rate=growth_rate,
+            growth_rate=growth_rate,  # May be None
             name=user_model.pop_names[i],
         )
-    del rate_param
 
     # Pass 2: Find all population splits by identifying changes in populationConversion
     dead_pops = {}
@@ -119,71 +112,49 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
 
             # Handle coalescence rate (effective population size) changes
             if epoch > 0:
-                crate_entry = user_model.coalescence.get_entry(epoch, i)
-                prev_crate_entry = user_model.coalescence.get_entry(epoch - 1, i)
-                grate_entry = user_model.growth.get_entry(epoch, i)
-                prev_grate_entry = user_model.growth.get_entry(epoch - 1, i)
+                coal_rate = user_model.coalescence.get_sim_value(epoch, i)
+                prev_coal_rate = user_model.coalescence.get_sim_value(epoch - 1, i)
+                grow_rate = user_model.growth.get_sim_value(epoch, i)
+                prev_grow_rate = user_model.growth.get_sim_value(epoch - 1, i)
                 if (
-                    prev_crate_entry != crate_entry
-                    and prev_crate_entry is not None
-                    and crate_entry is not None
-                ) or (grate_entry != prev_grate_entry):
-                    assert isinstance(crate_entry.rate, ParamRef)
-                    crate_param = user_model.coalescence.get_parameter(
-                        crate_entry.rate.param
-                    )
-                    if crate_param is not None:
-                        size = Ne_from_coal_rate(crate_param.ground_truth)
+                    prev_coal_rate != coal_rate
+                    and prev_coal_rate is not None
+                    and coal_rate is not None
+                ) or (grow_rate != prev_grow_rate):
+                    if coal_rate is not None:
+                        size = Ne_from_coal_rate(coal_rate)
                     else:
                         size = 0
-
-                    growth_rate = 0
-                    if grate_entry is not None:
-                        assert isinstance(grate_entry.rate, ParamRef)
-                        grate_param = user_model.growth.get_parameter(
-                            grate_entry.rate.param
-                        )
-                        growth_rate = grate_param.ground_truth
-                        print(f"Changing growth rate to {growth_rate}")
 
                     demography.add_population_parameters_change(
                         epoch_time,
                         initial_size=size,
                         population=i,
-                        growth_rate=growth_rate,
+                        growth_rate=grow_rate if grow_rate is not None else 0,
                     )
 
             # Handle migration with all other populations.
             for j in range(user_model.pop_count):
-                mrate_entry = user_model.migration.get_entry(epoch, i, j)
-                prev_mrate_entry = None
+                mig_rate = user_model.migration.get_sim_value(epoch, i, j)
                 if epoch > 0:
-                    prev_mrate_entry = user_model.migration.get_entry(epoch - 1, i, j)
+                    prev_mig_rate = user_model.migration.get_sim_value(epoch - 1, i, j)
 
                 # "The entry of [migration rate matrix] is the expected number of migrants moving from population i
                 #    to population j per generation, divided by the size of population j."
                 if epoch == 0:
-                    if mrate_entry is not None:
-                        assert isinstance(mrate_entry.rate, ParamRef)
-                        mrate_param = user_model.migration.get_parameter(
-                            mrate_entry.rate.param
-                        )
-                        demography.set_migration_rate(i, j, mrate_param.ground_truth)
+                    if mig_rate is not None:
+                        demography.set_migration_rate(i, j, mig_rate)
                 else:
                     # We have a change in rate.
-                    if mrate_entry != prev_mrate_entry:
-                        if mrate_entry is None:
+                    if mig_rate != prev_mig_rate:
+                        if mig_rate is None:
                             demography.add_migration_rate_change(
                                 time=epoch_time, rate=0, source=i, dest=j
                             )
                         else:
-                            assert isinstance(mrate_entry.rate, ParamRef)
-                            mrate_param = user_model.migration.get_parameter(
-                                mrate_entry.rate.param
-                            )
                             demography.add_migration_rate_change(
                                 time=epoch_time,
-                                rate=mrate_param.ground_truth,
+                                rate=mig_rate,
                                 source=i,
                                 dest=j,
                             )
