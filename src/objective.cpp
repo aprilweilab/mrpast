@@ -525,7 +525,7 @@ MatrixXd createASMatrix(const ParameterSchema& schema, double const* parameters,
     MatrixXd ASMatrix = MatrixXd::Zero(nStates, nStates);
     for (const auto& app : schema.m_admixtureApps) {
         if (app.epoch == epoch) {
-            ASMatrix(SIZE_T_TO_INDEX(app.i), SIZE_T_TO_INDEX(app.j)) =
+            ASMatrix(SIZE_T_TO_INDEX(app.i), SIZE_T_TO_INDEX(app.j)) +=
                 app.coeff * admixtureValues.at(app.v1) * admixtureValues.at(app.v2);
         }
     }

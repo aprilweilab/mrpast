@@ -700,9 +700,10 @@ def construct_stoch_matrix(
                 )
 
     def add_fixed(param_dict, fixed_list):
-        next_i = max(param_dict.keys()) + 1
-        for i in range(len(fixed_list)):
-            param_dict[next_i + i] = fixed_list[i]
+        if param_dict:
+            next_i = max(param_dict.keys()) + 1
+            for i in range(len(fixed_list)):
+                param_dict[next_i + i] = fixed_list[i]
 
     add_fixed(M_parameters, fixed_mig_params)
     add_fixed(Q_parameters, fixed_coal_params)

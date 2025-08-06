@@ -36,7 +36,7 @@ def _param_is_fixed(parameter: Dict[str, Any]) -> bool:
 
 
 def load_json_pandas(
-    filename: str, interval_field: Optional[str] = None
+    filename: str, interval_field: Optional[str] = None, skip_fixed: bool = True
 ) -> pd.DataFrame:
     """
     Load a solver output JSON file as a Pandas DataFrame.
@@ -46,6 +46,8 @@ def load_json_pandas(
         parameter) to use for computing the parameter confidence intervals. Typically
         this is "gim_ci", which is present on an output file if the "mrpast confidence"
         command was used to generate the JSON.
+    :param skip_fixed: Set to False to keep the fixed values that were part of the solution, otherwise
+        only the parameters will be returned.
     :return: Pandas DataDrame, where coalescent rates have been converted into effective
         population sizes (Ne).
     """
@@ -72,6 +74,9 @@ def load_json_pandas(
     for i, p in enumerate(epochs if epochs else []):
         v = clamp(p, p["final"])
         del p["apply_to"]
+        is_fixed = _param_is_fixed(p)
+        if is_fixed and skip_fixed:
+            continue
         p.update(
             {
                 "label": f"E{i}",
@@ -80,6 +85,7 @@ def load_json_pandas(
                 "err_hi": clamp(p, get_interval(p, 1)) - v,
                 "Optimized Value": v,
                 "Parameter Type": "Epoch time",
+                "Fixed": is_fixed,
             }
         )
         result.append(p)
@@ -87,7 +93,10 @@ def load_json_pandas(
     ncounter = 0
     gcounter = 0
     for p in data["smatrix_values_ne__gen"]:
-        if p["description"].startswith("Migration rate"):
+        is_fixed = _param_is_fixed(p)
+        if is_fixed and skip_fixed:
+            continue
+        if p["kind"] == "migration":
             v = clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
@@ -100,11 +109,12 @@ def load_json_pandas(
                     "Optimized Value": v,
                     "Parameter Type": "Migration rate",
                     "Epochs": epochs,
+                    "Fixed": is_fixed,
                 }
             )
             result.append(p)
             mcounter += 1
-        elif p["description"].startswith("Growth rate"):
+        elif p["kind"] == "growth":
             v = clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
@@ -117,11 +127,12 @@ def load_json_pandas(
                     "Optimized Value": v,
                     "Parameter Type": "Growth rate",
                     "Epochs": epochs,
+                    "Fixed": is_fixed,
                 }
             )
             result.append(p)
             gcounter += 1
-        elif p["description"].startswith("Coalescence rate"):
+        elif p["kind"] == "coalescence":
 
             def coal2ne(rate):
                 return 1 / (ploidy * clamp(p, rate))
@@ -141,10 +152,32 @@ def load_json_pandas(
                     "Optimized Value": v,
                     "Parameter Type": "Effective popsize",
                     "Epochs": epochs,
+                    "Fixed": is_fixed,
                 }
             )
             result.append(p)
             ncounter += 1
+    for acounter, p in enumerate(data["amatrix_parameters"]):
+        v = clamp(p, p["final"])
+        del p["apply_to"]
+        if "one_minus" in p:
+            del p["one_minus"]
+        is_fixed = _param_is_fixed(p)
+        if is_fixed and skip_fixed:
+            continue
+        p.update(
+            {
+                "label": f"A{acounter}",
+                "Ground Truth": clamp(p, p["ground_truth"]) if not is_fixed else p["init"],
+                "err_low": v - clamp(p, get_interval(p, 0)),
+                "err_hi": clamp(p, get_interval(p, 1)) - v,
+                "Optimized Value": v,
+                "Parameter Type": "Admixture proportion",
+                "Epochs": [],  # TODO
+                "Fixed": is_fixed,
+            }
+        )
+        result.append(p)
     return pd.DataFrame.from_dict(result)
 
 
