@@ -164,13 +164,14 @@ void ParameterSchema::load(const json& inputData) {
                               ground_truth,
                               parameter["kind_index"]};
         if (isJsonParamFixed(parameter)) {
-            m_eFixed.push_back(std::move(bv));
+            m_eFixedIdx.push_back(m_eParams.size());
         } else {
-            m_eParams.push_back(std::move(bv));
+            m_eParamIdx.push_back(m_eParams.size());
             m_paramRescale.emplace_back(EPOCH_TIME_RESCALE);
         }
+        m_eParams.push_back(std::move(bv));
     }
-    m_numEpochs = m_eParams.size() + m_eFixed.size() + 1;
+    m_numEpochs = m_eParams.size() + 1;
     m_sStates = std::vector<size_t>(m_numEpochs);
     // STOCHASTIC MATRIX (Q-Matrix) PARAMETERS
     for (const auto& parameter : inputData.at(SMATRIX_VALS_KEY)) {
@@ -199,11 +200,12 @@ void ParameterSchema::load(const json& inputData) {
                               parameter["description"],
                               ground_truth};
         if (isJsonParamFixed(parameter)) {
-            m_sFixed.push_back(std::move(bv));
+            m_sFixedIdx.push_back(m_sParams.size());
         } else {
-            m_sParams.push_back(std::move(bv));
+            m_sParamIdx.push_back(m_sParams.size());
             m_paramRescale.emplace_back(1.0);
         }
+        m_sParams.push_back(std::move(bv));
     }
     // ADMIXTURE STATE MATRIX PARAMETERS
     for (const auto& parameter : inputData.at(AMATRIX_PARAMS_KEY)) {
@@ -215,6 +217,14 @@ void ParameterSchema::load(const json& inputData) {
             }
         }
         const double ground_truth = getGroundTruth(parameter);
+        if (isJsonParamFixed(parameter)) {
+            m_aFixedIdx.push_back(m_aParams.size());
+        } else if (!oneMinus.empty()) {
+            m_aOneMinusIdx.push_back(m_aParams.size());
+        } else {
+            m_aParamIdx.push_back(m_aParams.size());
+            m_paramRescale.emplace_back(1.0);
+        }
         BoundedVariable bv = {parameter["init"],
                               parameter["lb"],
                               parameter["ub"],
@@ -223,12 +233,7 @@ void ParameterSchema::load(const json& inputData) {
                               ground_truth,
                               parameter["kind_index"],
                               std::move(oneMinus)};
-        if (isJsonParamFixed(parameter)) {
-            m_aFixed.push_back(std::move(bv));
-        } else {
-            m_aParams.push_back(std::move(bv));
-            m_paramRescale.emplace_back(1.0);
-        }
+        m_aParams.push_back(std::move(bv));
     }
     for (const auto& application : inputData.at(AMATRIX_APPS_KEY)) {
         m_admixtureApps.push_back({
@@ -240,7 +245,7 @@ void ParameterSchema::load(const json& inputData) {
             application["vars"].at(1),
         });
     }
-    RELEASE_ASSERT(m_sParams.size() + m_eParams.size() + m_aParams.size() == m_paramRescale.size());
+    RELEASE_ASSERT(m_sParamIdx.size() + m_eParamIdx.size() + m_aParamIdx.size() == m_paramRescale.size());
 }
 
 /**
@@ -249,11 +254,21 @@ void ParameterSchema::load(const json& inputData) {
  */
 void ParameterSchema::randomParamVector(double* parameters) const {
     size_t p = 0;
-    for (const auto& parameter : m_eParams) {
+    for (const size_t index : m_eParamIdx) {
+        const auto& parameter = m_eParams.at(index);
+        RELEASE_ASSERT(p < totalParams());
         parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
         p++;
     }
-    for (const auto& parameter : m_sParams) {
+    for (const size_t index : m_sParamIdx) {
+        const auto& parameter = m_sParams.at(index);
+        RELEASE_ASSERT(p < totalParams());
+        parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
+        p++;
+    }
+    for (const size_t index : m_aParamIdx) {
+        const auto& parameter = m_aParams.at(index);
+        RELEASE_ASSERT(p < totalParams());
         parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
         p++;
     }
@@ -265,24 +280,42 @@ void ParameterSchema::randomParamVector(double* parameters) const {
  */
 void ParameterSchema::initParamVector(double* parameters) const {
     size_t p = 0;
-    for (const auto& parameter : m_eParams) {
+    for (const size_t index : m_eParamIdx) {
+        const auto& parameter = m_eParams.at(index);
+        RELEASE_ASSERT(p < totalParams());
         parameters[p] = toParam(parameter.init, p);
         p++;
     }
-    for (const auto& parameter : m_sParams) {
+    for (const size_t index : m_sParamIdx) {
+        const auto& parameter = m_sParams.at(index);
+        RELEASE_ASSERT(p < totalParams());
+        parameters[p] = toParam(parameter.init, p);
+        p++;
+    }
+    for (const size_t index : m_aParamIdx) {
+        const auto& parameter = m_aParams.at(index);
+        RELEASE_ASSERT(p < totalParams());
         parameters[p] = toParam(parameter.init, p);
         p++;
     }
 }
 
 void ParameterSchema::getBounds(size_t paramIdx, double& lowerBound, double& upperBound) const {
-    if (paramIdx < m_eParams.size()) {
-        lowerBound = toParam(m_eParams.at(paramIdx).lb, paramIdx);
-        upperBound = toParam(m_eParams.at(paramIdx).ub, paramIdx);
+    if (paramIdx < m_eParamIdx.size()) {
+        const size_t index = m_eParamIdx[paramIdx];
+        lowerBound = toParam(m_eParams.at(index).lb, paramIdx);
+        upperBound = toParam(m_eParams.at(index).ub, paramIdx);
     } else {
-        const size_t sIdx = paramIdx - m_eParams.size();
-        lowerBound = toParam(m_sParams.at(sIdx).lb, paramIdx);
-        upperBound = toParam(m_sParams.at(sIdx).ub, paramIdx);
+        const size_t nextIdx = paramIdx - m_eParamIdx.size();
+        if (nextIdx < m_sParamIdx.size()) {
+            const size_t index = m_sParamIdx[nextIdx];
+            lowerBound = toParam(m_sParams.at(index).lb, paramIdx);
+            upperBound = toParam(m_sParams.at(index).ub, paramIdx);
+        } else {
+            const size_t index = m_aParamIdx.at(nextIdx - m_sParamIdx.size());
+            lowerBound = toParam(m_aParams.at(index).lb, paramIdx);
+            upperBound = toParam(m_aParams.at(index).ub, paramIdx);
+        }
     }
 }
 
@@ -290,54 +323,96 @@ double ParameterSchema::getEpochStartTime(double const* parameters, size_t epoch
     assert(epoch < m_numEpochs);
     if (epoch > 0) {
         const size_t epochIndex = epoch - 1;
-        for (size_t i = 0; i < m_eParams.size(); i++) {
-            if (m_eParams[i].kind_index == epochIndex) {
+        for (size_t i = 0; i < m_eParamIdx.size(); i++) {
+            if (m_eParamIdx[i] == epochIndex) {
                 return fromParam(parameters[i], i);
             }
         }
-        for (size_t i = 0; i < m_eFixed.size(); i++) {
-            return m_eFixed[i].init;
+        for (size_t index : m_eFixedIdx) {
+            if (index == epochIndex) {
+                return m_eParams[index].init;
+            }
         }
+        RELEASE_ASSERT(false);
     }
     return 0.0;
 }
 
+std::vector<double> getAdmixtureValues(const ParameterSchema& schema, double const* parameters) {
+    // Copy all of the parameter and fixed values into the admixture value vector.
+    const size_t firstParamIdx = schema.m_eParamIdx.size() + schema.m_sParamIdx.size();
+    const size_t numAdmixtureValues = schema.m_aParams.size();
+    std::vector<double> admixtureValues(numAdmixtureValues);
+    // Copy parameters from the solver input
+    size_t paramIdx = firstParamIdx;
+    for (const size_t index : schema.m_aParamIdx) {
+        RELEASE_ASSERT(paramIdx < schema.totalParams());
+        admixtureValues.at(index) = schema.fromParam(parameters[paramIdx], paramIdx);
+        paramIdx++;
+    }
+    // Populate the fixed values  (TODO: could prepopulate this during parsing)
+    for (const size_t index : schema.m_aFixedIdx) {
+        admixtureValues.at(index) = schema.m_aParams.at(index).init;
+    }
+    // Populate the "one-minus" values (parameters determined by other parameters)
+    for (const size_t index : schema.m_aOneMinusIdx) {
+        double sum = 0.0;
+        for (const size_t otherIndex : schema.m_aParams.at(index).oneMinus) {
+            sum += admixtureValues.at(otherIndex);
+        }
+        admixtureValues.at(index) = 1.0 - sum;
+    }
+    return std::move(admixtureValues);
+}
+
 json ParameterSchema::toJsonOutput(const double* parameters, const double negLL) const {
     json output = m_inputJson; // Make a copy of the input.
-    size_t e = 0;
+    size_t i = 0;
     size_t p = 0;
-    RELEASE_ASSERT(output.at(EPOCH_TIMES_KEY).size() == m_eParams.size() + m_eFixed.size());
+    RELEASE_ASSERT(output.at(EPOCH_TIMES_KEY).size() == m_eParams.size());
     for (auto& parameter : output.at(EPOCH_TIMES_KEY)) {
         if (isJsonParamFixed(parameter)) {
-            parameter["final"] = m_eFixed.at(e).init;
-            e++;
+            parameter["final"] = m_eParams.at(i).init;
         } else {
+            RELEASE_ASSERT(p < totalParams());
             parameter["final"] = fromParam(parameters[p], p);
             p++;
         }
+        i++;
     }
-    RELEASE_ASSERT(e == m_eFixed.size());
-    RELEASE_ASSERT(p == m_eParams.size());
-    RELEASE_ASSERT(output.at(SMATRIX_VALS_KEY).size() == m_sParams.size() + m_sFixed.size());
-    size_t s = 0;
+    RELEASE_ASSERT(i == m_eParams.size());
+    RELEASE_ASSERT(p == m_eParamIdx.size());
+
+    RELEASE_ASSERT(output.at(SMATRIX_VALS_KEY).size() == m_sParams.size());
+    i = 0;
     for (auto& parameter : output.at(SMATRIX_VALS_KEY)) {
-        const size_t smIndex = (p - m_eParams.size());
         if (isJsonParamFixed(parameter)) {
-            parameter["final"] = m_sFixed.at(s).init;
-            s++;
+            parameter["final"] = m_sParams.at(i).init;
         } else {
-            RELEASE_ASSERT(smIndex < m_sParams.size());
+            RELEASE_ASSERT(p < totalParams());
             parameter["final"] = fromParam(parameters[p], p);
             p++;
         }
+        i++;
     }
-    RELEASE_ASSERT(s == m_sFixed.size());
-    RELEASE_ASSERT((p - m_eParams.size()) == m_sParams.size());
+    RELEASE_ASSERT(i == m_sParams.size());
+    RELEASE_ASSERT((p - m_eParamIdx.size()) == m_sParamIdx.size());
+
+    RELEASE_ASSERT(output.at(AMATRIX_PARAMS_KEY).size() == m_aParams.size());
+    i = 0;
+    std::vector<double> admixtureValues = getAdmixtureValues(*this, parameters);
+    for (auto& parameter : output.at(AMATRIX_PARAMS_KEY)) {
+        parameter["final"] = admixtureValues.at(i);
+        i++;
+    }
+    RELEASE_ASSERT(i == m_aParams.size());
+
     output["negLL"] = negLL;
     return std::move(output);
 }
 
 void ParameterSchema::fromJsonOutput(const json& jsonOutput, double* parameters, std::string key) const {
+    RELEASE_ASSERT(false); // FIXME
     size_t p = 0;
     for (const auto& paramVal : jsonOutput[EPOCH_TIMES_KEY]) {
         if (!isJsonParamFixed(paramVal)) {
@@ -366,7 +441,7 @@ createQMatrix(const ParameterSchema& schema, double const* parameters, size_t ep
 
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch));
     // Skip this many epoch transition times.
-    const size_t firstParamIdx = schema.m_eParams.size();
+    const size_t firstParamIdx = schema.m_eParamIdx.size();
     MatrixXd qMatrix = MatrixXd::Zero(nStates, nStates);
 
     auto applyParameter =
@@ -396,13 +471,16 @@ createQMatrix(const ParameterSchema& schema, double const* parameters, size_t ep
 
     // Apply the non-parameters first.
     bool anyAdjusted = false;
-    for (const auto& param : schema.m_sFixed) {
+    for (const size_t index : schema.m_sFixedIdx) {
+        const auto& param = schema.m_sParams.at(index);
         applyParameter(param.applications, param.init, anyAdjusted);
     }
-    for (size_t p = 0; p < schema.m_sParams.size(); p++) {
-        const size_t paramIdx = firstParamIdx + p;
+    for (size_t i = 0; i < schema.m_sParamIdx.size(); i++) {
+        const size_t paramIdx = firstParamIdx + i;
+        RELEASE_ASSERT(paramIdx < schema.totalParams());
         double pVal = schema.fromParam(parameters[paramIdx], paramIdx);
-        applyParameter(schema.m_sParams[p].applications, pVal, anyAdjusted);
+        const size_t index = schema.m_sParamIdx[i];
+        applyParameter(schema.m_sParams.at(index).applications, pVal, anyAdjusted);
     }
     // Sum the off-diagonal and set the diagonal to the negative sum. This makes a valid
     // Q-matrix.
@@ -440,16 +518,7 @@ void verifyASMatrix(const MatrixXd& ASMatrix) {
 MatrixXd createASMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch) {
     assert(epoch < schema.numEpochs());
 
-    // Copy all of the parameter and fixed values into the admixture value vector.
-    const size_t firstParamIdx = schema.m_eParams.size() + schema.m_sParams.size();
-    const size_t numAdmixtureValues = schema.m_aParams.size() + schema.m_aFixed.size();
-    std::vector<double> admixtureValues(numAdmixtureValues);
-    for (size_t i = 0; i < schema.m_aParams.size(); i++) {
-        admixtureValues[i] = schema.fromParam(parameters[i + firstParamIdx], i + firstParamIdx);
-    }
-    for (size_t i = 0; i < schema.m_aFixed.size(); i++) {
-        admixtureValues[schema.m_aParams.size() + i] = schema.m_aFixed.at(i).init;
-    }
+    std::vector<double> admixtureValues = getAdmixtureValues(schema, parameters);
 
     // Now apply these values to construct the matrix, we leave off the coalescence state.
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch) - 1);

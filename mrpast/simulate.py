@@ -24,7 +24,10 @@ import os
 from mrpast.helpers import (
     load_ratemap,
 )
-from mrpast.model import UserModel
+from mrpast.model import UserModel, ParamRef
+
+
+MAX_EPOCH = 2**32
 
 
 def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[int]]:
@@ -84,21 +87,41 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
             name=user_model.pop_names[i],
         )
 
-    # Pass 2: Find all population splits by identifying changes in populationConversion
+    # Pass 2: Find all population splits and admixture events.
+    def proportionAsFloat(proportion: Union[float, ParamRef]) -> float:
+        if isinstance(proportion, ParamRef):
+            return user_model.admixture.get_parameter(proportion.param).ground_truth
+        return float(proportion)
+
     dead_pops = {}
-    for dest_epoch in range(1, num_epochs):
-        source_epoch = dest_epoch - 1
-        derived = defaultdict(list)
-        for src_pop in range(num_pops):
-            dest_pop = user_model.pop_convert[source_epoch][src_pop]
-            if dest_pop != src_pop and src_pop not in dead_pops:
-                derived[dest_pop].append(src_pop)
-                dead_pops[src_pop] = dest_epoch
-        epoch_time = user_model.epochs.epoch_times[source_epoch].ground_truth
-        for dest_pop, derived_list in derived.items():
-            demography.add_population_split(
-                time=epoch_time, derived=list(derived_list), ancestral=dest_pop
-            )
+    for epoch in range(1, user_model.num_epochs):
+        # Collect all entries by their derived population.
+        by_derived = defaultdict(list)
+        for i, entry in enumerate(user_model.admixture.entries):
+            if entry.epoch == epoch:
+                by_derived[entry.derived].append(
+                    (entry.ancestral, proportionAsFloat(entry.proportion))
+                )
+        epoch_start = user_model.epochs.epoch_times[epoch - 1].ground_truth
+        for derived_deme in range(user_model.num_demes):
+            # Population split if we have a 1-to-1 mapping.
+            # TODO: do we need to collate multiple splits with the same ancestral, or will msprime do it?
+            if len(by_derived[derived_deme]) == 1:
+                ancestral, proportion = by_derived[derived_deme][0]
+                assert abs(1.0 - proportion) < 1e6
+                demography.add_population_split(
+                    time=epoch_start, derived=[derived_deme], ancestral=ancestral
+                )
+                dead_pops[derived_deme] = epoch
+            # Otherwise it is admixture.
+            elif len(by_derived[i]) > 1:
+                demography.add_admixture(
+                    epoch_start,
+                    derived=derived_deme,
+                    ancestral=list(map(lambda t: t[0], by_derived[derived_deme])),
+                    proportions=list(map(lambda t: t[1], by_derived[derived_deme])),
+                )
+                dead_pops[derived_deme] = epoch
 
     # Pass 3: setup the initial migration rates and rate change events.
     for epoch in range(num_epochs):
@@ -107,7 +130,7 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
             epoch_time = user_model.epochs.epoch_times[epoch - 1].ground_truth
         for i in range(num_pops):
             # We skip any dead populations. The simulator will yell at us for trying to make changes to them.
-            if dead_pops.get(i, 2**32) <= epoch:
+            if dead_pops.get(i, MAX_EPOCH) <= epoch:
                 continue
 
             # Handle coalescence rate (effective population size) changes

@@ -45,8 +45,6 @@ epochTimeSplit:
 - {"ground_truth": 920.0, "lb": 562.0, "ub": 1480.0, "index": 2}
 - {"ground_truth": 2040.0, "lb": 1480.0, "ub": 3980.0, "index": 3}
 - {"ground_truth": 5920.0, "lb": 3980.0, "ub": 7910.0, "index": 4}
-populationConversion:
-- [0, 1]
-- [0, 1]
-- [0, 0]
-- [0, 0]
+admixture:
+  entries:
+  - {"epoch": 3, "ancestral": "AFR", "derived": "EUR", "proportion": 1.0}

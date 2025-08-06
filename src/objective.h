@@ -189,7 +189,7 @@ public:
 
     size_t numEpochs() const { return m_numEpochs; }
 
-    size_t totalParams() const { return m_eParams.size() + m_sParams.size(); }
+    size_t totalParams() const { return m_eParamIdx.size() + m_sParamIdx.size() + m_aParamIdx.size(); }
 
     size_t numStates(size_t epoch) const { return m_sStates.at(epoch); }
 
@@ -219,13 +219,17 @@ public:
 
     // Parameters and fixed values for epoch times
     VarList m_eParams;
-    VarList m_eFixed;
+    std::vector<size_t> m_eParamIdx;
+    std::vector<size_t> m_eFixedIdx;
     // Parameters and fixed values for stochastic matrix (by epoch)
     VarList m_sParams;
-    VarList m_sFixed;
-    // Parameters and fixed values for admixture matrix (by epoch)
+    std::vector<size_t> m_sParamIdx;
+    std::vector<size_t> m_sFixedIdx;
+    // Parameters, fixed values, and no-degrees-of-freedom params for admixture matrix (by epoch)
     VarList m_aParams;
-    VarList m_aFixed;
+    std::vector<size_t> m_aParamIdx;
+    std::vector<size_t> m_aFixedIdx;
+    std::vector<size_t> m_aOneMinusIdx;
     std::vector<AdmixtureApplication> m_admixtureApps;
 
 private:
@@ -249,6 +253,7 @@ private:
 
 template <typename T>
 void ParameterSchema::addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data) {
+    RELEASE_ASSERT(false); // FIXME
     size_t p = 0;
     json& epochTimes = outputData[EPOCH_TIMES_KEY];
     for (size_t i = 0; i < m_eParams.size(); i++) {

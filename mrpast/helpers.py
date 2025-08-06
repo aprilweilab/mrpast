@@ -405,10 +405,13 @@ def load_old_mrpast(yaml_file: str) -> UserModel:
                 if derived != ancestral and derived not in dead:
                     admix_entries.append(AdmixtureEntry(epoch, ancestral, derived, 1.0))
                     dead.add(derived)
+        pop_names = config.get("pop_names", [])
+        if not pop_names:
+            pop_names = [f"pop_{i}" for i in range(pop_count)]
         result = UserModel(
             ploidy=config.get("ploidy", 2),
             pop_count=pop_count,
-            pop_names=config.get("pop_names", []),
+            pop_names=pop_names,
             migration=DemeDemeRates(mig_entries, mig_params),
             coalescence=DemeRates(coal_entries, coal_params),
             epochs=epochs,

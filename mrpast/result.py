@@ -31,6 +31,10 @@ except ImportError:
     plt = None  # type: ignore
 
 
+def _param_is_fixed(parameter: Dict[str, Any]) -> bool:
+    return parameter["lb"] == parameter["ub"]
+
+
 def load_json_pandas(
     filename: str, interval_field: Optional[str] = None
 ) -> pd.DataFrame:
@@ -395,12 +399,15 @@ def tab_show(filename: str, sort_by: str = "Index"):
         output = json.load(f)
 
     all_params: List[Dict[str, Any]] = (output.get("epoch_times_gen", []) or []) + (
-        output.get("smatrix_values_ne__gen", []) or []
+        (output.get("smatrix_values_ne__gen", []) or [])
+        + (output.get("amatrix_parameters", []) or [])
     )
     results = []
     total_rel = 0.0
     total_abs = 0.0
     for param_idx, param in enumerate(all_params):
+        if _param_is_fixed(param):
+            continue
         gt = param["ground_truth"]
         final = param["final"]
         abserr = abs(gt - final)

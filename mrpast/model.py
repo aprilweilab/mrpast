@@ -49,8 +49,6 @@ class ParameterKind(str, Enum):
     PARAM_KIND_COAL = "coalescence"
     PARAM_KIND_GROWTH = "growth"
     PARAM_KIND_ADMIXTURE = "admixture"
-    # Admixture parameter that is determined by the sum of other admixture parameters.
-    PARAM_KIND_ADMIX_DET = "admixture_det"
 
 
 class TimeSliceAdjustment(str, Enum):
@@ -96,9 +94,13 @@ class BoundedVariable:
     init: float
     lb: float
     ub: float
+    # kind and kind_index provide a mapping back to the user model. Given a user model with
+    # parameters in a particular order, kind_index gives that order.
     kind: str
     kind_index: int
+    # How to apply this variable to the stochastic matrix.
     apply_to: List[VariableApplication] = field(default_factory=list)
+    # When non-empty, this variable is completely determined by the variables listed here.
     one_minus: List[int] = field(default_factory=list)
     description: str = ""
     ground_truth: Optional[float] = None
@@ -155,6 +157,7 @@ class BoundedVariable:
             kind=self.kind,
             kind_index=self.kind_index,
             apply_to=self.apply_to,
+            one_minus=self.one_minus,
             description=self.description,
             ground_truth=self.ground_truth,
         )
@@ -793,6 +796,8 @@ class ModelSolverInput:
             amatrices.append(
                 [[None for _ in range(model.num_demes)] for _ in range(model.num_demes)]
             )
+        # These parameters are in arbitrary order. If you want to get back to the original parameters
+        # then use BoundedVariable.kind_index.
         amatrix_params = []
         for i, entry in enumerate(model.admixture.entries):
             assert entry.epoch > 0
@@ -802,9 +807,9 @@ class ModelSolverInput:
                     BoundedVariable.from_float_parameter(
                         model.admixture.get_parameter(entry.proportion.param),
                         ParameterKind.PARAM_KIND_ADMIXTURE,
-                        i,
+                        entry.proportion.param,
                         not init_from_ground_truth,
-                        f"Admixture proportion between {entry.ancestral} and {entry.derived}",
+                        f"Admixture proportion between {model.pop_names[int(entry.ancestral)]} and {model.pop_names[int(entry.derived)]}",
                     )
                 )
             else:
@@ -812,14 +817,18 @@ class ModelSolverInput:
                     BoundedVariable.from_float_value(
                         entry.proportion,
                         ParameterKind.PARAM_KIND_ADMIXTURE,
-                        i,
-                        f"Admixture proportion between {entry.ancestral} and {entry.derived}",
+                        -1,
+                        f"Fixed admixture proportion between {model.pop_names[int(entry.ancestral)]} and {model.pop_names[int(entry.derived)]}",
                     )
                 )
             amatrices[entry.epoch - 1][int(entry.derived)][int(entry.ancestral)] = i
         # Special constant of 1 that we use throughout.
         param_const_one = BoundedVariable(
-            1, 1, 1, ParameterKind.PARAM_KIND_ADMIXTURE, 0
+            init=1,
+            lb=1,
+            ub=1,
+            kind=ParameterKind.PARAM_KIND_ADMIXTURE,
+            kind_index=-1,
         )
         index_const_one = len(amatrix_params)
         amatrix_params.append(param_const_one)
@@ -856,14 +865,11 @@ class ModelSolverInput:
                     other_indexes = list(map(lambda t: t[0], by_derived[i][:-1]))
                     last_index, _ = by_derived[i][-1]
                     amatrix_params[last_index].one_minus = other_indexes
-                    amatrix_params[last_index].kind = ParameterKind.PARAM_KIND_ADMIX_DET
 
         amatrix_apps = []
         all_states = model.get_ordered_states()
-        # print(f"STATES: {all_states}")
         for epoch in range(1, model.num_epochs):
             amatrix = amatrices[epoch - 1]
-            # print(f"EPOCH: {epoch} has state 01->01 (1->1) as {amatrix[all_states[1][0]][all_states[1][0]]},{amatrix[all_states[1][1]][all_states[1][1]]}")
             for from_state, (i, j) in enumerate(all_states):
                 for to_state, (k, l) in enumerate(all_states):
 
