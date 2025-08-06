@@ -46,7 +46,7 @@ using Eigen::VectorXd;
 
 #define DUMP_MATRIX(m, desc)                                                                                           \
     do {                                                                                                               \
-        std::cerr << "% " << desc << ":" << std::endl;                                                                 \
+        std::cerr << "% " << desc << ": " << std::endl;                                                                \
         std::cerr << "[";                                                                                              \
         for (Eigen::Index i = 0; i < (m).rows(); i++) {                                                                \
             if (i > 0) {                                                                                               \
@@ -653,7 +653,10 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 #endif
 
             epochStart = time;
-            currentStateMap = createASMatrix(schema, parameters, newEpoch);
+            const auto ASMatrix = createASMatrix(schema, parameters, newEpoch);
+            TRACE_MATRIX(ASMatrix, "ASMatrix(" << newEpoch << ")");
+            currentStateMap = currentStateMap * ASMatrix;
+            TRACE_MATRIX(currentStateMap, "currentStateMap(" << newEpoch << ")");
             currentEpoch = newEpoch;
         }
     }

@@ -24,14 +24,16 @@ import tempfile
 import numpy
 import msprime
 from mrpast.model import (
-    UserModel,
+    AdmixtureEntry,
+    AdmixtureGroup,
+    DemeDemeEntry,
     DemeDemeRates,
+    DemeRateEntry,
     DemeRates,
     FloatParameter,
-    SymbolicEpochs,
-    DemeDemeEntry,
-    DemeRateEntry,
     ParamRef,
+    SymbolicEpochs,
+    UserModel,
 )
 
 try:
@@ -109,17 +111,12 @@ def dump_model_yaml(model: UserModel, out):
     model.unresolve_names()
 
     def dump_parameters(parameters: List[FloatParameter], indent=2, no_label=False):
-        prefix = " " * indent
-        if not no_label:
-            print(f"{prefix}parameters:", file=out)
-        for param in parameters:
-            print(f"{prefix}- {param.to_json()}", file=out)
-
-    def dump_vectors_raw(vectors: List[List[Union[int, float]]], indent=2):
-        prefix = " " * indent
-        for vector in vectors:
-            line_prefix = f"{prefix}- "
-            print(f"{line_prefix}{json.dumps(vector)}", file=out)
+        if parameters:
+            prefix = " " * indent
+            if not no_label:
+                print(f"{prefix}parameters:", file=out)
+            for param in parameters:
+                print(f"{prefix}- {param.to_json()}", file=out)
 
     out.write(dump({"ploidy": model.ploidy}, Dumper=Dumper))
     if model.pop_count > 0:
@@ -145,8 +142,12 @@ def dump_model_yaml(model: UserModel, out):
         dump_parameters(model.migration.parameters)
     print(f"epochTimeSplit:", file=out)
     dump_parameters(model.epochs.epoch_times, indent=0, no_label=True)
-    print(f"populationConversion:", file=out)
-    dump_vectors_raw(model.pop_convert, indent=0)
+    if model.admixture.entries:
+        print(f"admixture:", file=out)
+        print(f"  entries:", file=out)
+        for e in model.admixture.entries:
+            print(f"  - {e.to_json()}", file=out)
+        dump_parameters(model.admixture.parameters)
 
 
 def haps2vcf(input_prefix, output_prefix, ploidy=2):
@@ -394,7 +395,16 @@ def load_old_mrpast(yaml_file: str) -> UserModel:
                     if m[i] != 0:
                         grow_entries.append(DemeRateEntry(e, i, ParamRef(int(m[i]))))
         epochs = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
-        pop_convert = config.get("populationConversion", []) or []
+        # Convert from the simple population conversion map into admixture entries
+        admix_entries = []
+        dead = set()
+        for i, epoch_row in enumerate(config.get("populationConversion", []) or []):
+            epoch = i + 1
+            for derived in range(len(epoch_row)):
+                ancestral = epoch_row[derived]
+                if derived != ancestral and derived not in dead:
+                    admix_entries.append(AdmixtureEntry(epoch, ancestral, derived, 1.0))
+                    dead.add(derived)
         result = UserModel(
             ploidy=config.get("ploidy", 2),
             pop_count=pop_count,
@@ -403,6 +413,6 @@ def load_old_mrpast(yaml_file: str) -> UserModel:
             coalescence=DemeRates(coal_entries, coal_params),
             epochs=epochs,
             growth=DemeRates(grow_entries, grow_params),
-            pop_convert=pop_convert,
+            admixture=AdmixtureGroup(admix_entries, []),
         )
         return result

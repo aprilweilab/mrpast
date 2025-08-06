@@ -16,6 +16,8 @@
 import math
 from typing import Dict, Any, Optional
 from mrpast.model import (
+    AdmixtureGroup,
+    AdmixtureEntry,
     UserModel,
     DEFAULT_PLOIDY,
     DemeDemeRates,
@@ -46,7 +48,7 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         coalescence=DemeRates(entries=[], parameters=[]),
         growth=DemeRates(entries=[], parameters=[]),
         epochs=SymbolicEpochs([]),
-        pop_convert=[],
+        admixture=AdmixtureGroup([], []),
     )
     name2deme = {}
 
@@ -58,7 +60,6 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     assert (
         demes_model.time_units == TIME_UNIT_GENS
     ), "Only time_units supported is generations"
-    num_demes = len(demes_model.demes)
 
     # List of epochs, ordered by most recent time first.
     epoch_set = set()
@@ -74,8 +75,6 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
     del epoch_delimiters[-1]
     num_epochs = len(epoch_delimiters)
     epochs_by_start = {e: i for i, e in enumerate(epoch_delimiters)}
-    for _ in range(num_epochs - 1):
-        output_model.pop_convert.append(list(range(len(demes_model.demes))))
 
     def add_param(param_list, gt_value, lb=1e-5, ub=0.01):
         index = len(param_list) + 1
@@ -134,25 +133,17 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
                 last_epoch = max(last_epoch, e_idx)
                 e_idx = (e_idx + 1) if (e_idx + 1) < len(epochs_by_start) else None
         if d.ancestors:
-            assert (
-                len(d.ancestors) == 1
-            ), "mrpast does not support admixture; only 1-to-1 population split"
+            assert len(d.ancestors) == 1 or (
+                len(d.ancestors) == len(d.proportions)
+            ), "More than one ancestral population requires 'proportions' be specified in Demes model"
+            proportions = d.proportions if len(d.proportions) > 0 else [1.0]
             # Set the population splits.
-            for a in d.ancestors:
-                output_model.pop_convert[last_epoch][d_idx] = name2deme[a]
-        # Mark the population as dead in the relevant epochs.
-        for e_idx in range(last_epoch + 1, num_epochs - 1):
-            output_model.pop_convert[e_idx][d_idx] = float("NaN")
-
-    prev_row = list(range(num_demes))
-    for row in output_model.pop_convert:
-        for i in range(len(row)):
-            if math.isnan(row[i]):
-                last_dest = prev_row[i]
-                current_dest = row[last_dest]
-                assert not math.isnan(current_dest)
-                row[i] = current_dest
-        prev_row = row
+            for ancestral, proportion in zip(d.ancestors, proportions):
+                output_model.admixture.entries.append(
+                    AdmixtureEntry(
+                        last_epoch + 1, name2deme[ancestral], d_idx, proportion
+                    )
+                )
 
     for m in demes_model.migrations:
         e_end = epochs_by_start.get(m.start_time, None)

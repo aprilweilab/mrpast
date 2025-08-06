@@ -518,6 +518,7 @@ class UserModel:
         self.migration.unresolve_names(self.pop_names)
         self.coalescence.unresolve_names(self.pop_names)
         self.growth.unresolve_names(self.pop_names)
+        self.admixture.unresolve_names(self.pop_names)
 
     @property
     def num_epochs(self) -> int:
@@ -785,6 +786,8 @@ class ModelSolverInput:
         ]
 
         # Generate the amatrix parameter applications for all except the first epoch.
+        # These are not cumulative. In the solver, it composes each epoch's AS matrix to create
+        # the cumulative effect.
         amatrices: List[List[List[Optional[int]]]] = []
         for epoch in range(1, model.num_epochs):
             amatrices.append(
