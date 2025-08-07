@@ -105,7 +105,6 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
         epoch_start = user_model.epochs.epoch_times[epoch - 1].ground_truth
         for derived_deme in range(user_model.num_demes):
             # Population split if we have a 1-to-1 mapping.
-            # TODO: do we need to collate multiple splits with the same ancestral, or will msprime do it?
             if len(by_derived[derived_deme]) == 1:
                 ancestral, proportion = by_derived[derived_deme][0]
                 assert abs(1.0 - proportion) < 1e6
@@ -114,7 +113,7 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
                 )
                 dead_pops[derived_deme] = epoch
             # Otherwise it is admixture.
-            elif len(by_derived[i]) > 1:
+            elif len(by_derived[derived_deme]) > 1:
                 demography.add_admixture(
                     epoch_start,
                     derived=derived_deme,

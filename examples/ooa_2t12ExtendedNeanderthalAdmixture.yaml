@@ -6,20 +6,20 @@ pop_names:
 - NEAN
 coalescence:
   entries:
-  - {"epoch": 0, "deme": 0, "rate": {"param": 3}}
-  - {"epoch": 0, "deme": 1, "rate": {"param": 6}}
-  - {"epoch": 0, "deme": 2, "rate": {"param": 7}}
-  - {"epoch": 1, "deme": 0, "rate": {"param": 2}}
-  - {"epoch": 1, "deme": 1, "rate": {"param": 5}}
-  - {"epoch": 1, "deme": 2, "rate": {"param": 7}}
-  - {"epoch": 2, "deme": 0, "rate": {"param": 2}}
-  - {"epoch": 2, "deme": 1, "rate": {"param": 4}}
-  - {"epoch": 2, "deme": 2, "rate": {"param": 7}}
-  - {"epoch": 3, "deme": 0, "rate": {"param": 2}}
-  - {"epoch": 3, "deme": 2, "rate": {"param": 7}}
-  - {"epoch": 4, "deme": 0, "rate": {"param": 1}}
-  - {"epoch": 4, "deme": 2, "rate": {"param": 7}}
-  - {"epoch": 5, "deme": 0, "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 3}}
+  - {"epoch": 0, "deme": "EUR", "rate": {"param": 6}}
+  - {"epoch": 0, "deme": "NEAN", "rate": {"param": 7}}
+  - {"epoch": 1, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "EUR", "rate": {"param": 5}}
+  - {"epoch": 1, "deme": "NEAN", "rate": {"param": 7}}
+  - {"epoch": 2, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "deme": "EUR", "rate": {"param": 4}}
+  - {"epoch": 2, "deme": "NEAN", "rate": {"param": 7}}
+  - {"epoch": 3, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 3, "deme": "NEAN", "rate": {"param": 7}}
+  - {"epoch": 4, "deme": "AFR", "rate": {"param": 1}}
+  - {"epoch": 4, "deme": "NEAN", "rate": {"param": 7}}
+  - {"epoch": 5, "deme": "AFR", "rate": {"param": 1}}
   parameters:
   - {"ground_truth": 6.839945280437756e-05, "lb": 1e-07, "ub": 0.01, "index": 1}
   - {"ground_truth": 3.45447008428907e-05, "lb": 1e-07, "ub": 0.01, "index": 2}
@@ -30,22 +30,22 @@ coalescence:
   - {"ground_truth": 5e-05, "lb": 1e-07, "ub": 0.01, "index": 7}
 growth:
   entries:
-  - {"epoch": 0, "deme": 0, "rate": {"param": 1}}
-  - {"epoch": 0, "deme": 1, "rate": {"param": 3}}
-  - {"epoch": 1, "deme": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "EUR", "rate": {"param": 3}}
+  - {"epoch": 1, "deme": "EUR", "rate": {"param": 2}}
   parameters:
   - {"ground_truth": 0.0166, "lb": 0.001, "ub": 0.05, "index": 1}
   - {"ground_truth": 0.0030700000000000002, "lb": 0.001, "ub": 0.05, "index": 2}
   - {"ground_truth": 0.0195, "lb": 0.001, "ub": 0.05, "index": 3}
 migration:
   entries:
-  - {"epoch": 0, "source": 0, "dest": 1, "rate": {"param": 2}}
-  - {"epoch": 0, "source": 1, "dest": 0, "rate": {"param": 2}}
-  - {"epoch": 1, "source": 0, "dest": 1, "rate": {"param": 2}}
-  - {"epoch": 1, "source": 1, "dest": 0, "rate": {"param": 2}}
-  - {"epoch": 2, "source": 0, "dest": 1, "rate": {"param": 1}}
-  - {"epoch": 2, "source": 1, "dest": 0, "rate": {"param": 1}}
-  - {"epoch": 2, "source": 1, "dest": 2, "rate": {"param": 3}}
+  - {"epoch": 0, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 0, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "source": "AFR", "dest": "EUR", "rate": {"param": 1}}
+  - {"epoch": 2, "source": "EUR", "dest": "AFR", "rate": {"param": 1}}
+  - {"epoch": 2, "source": "EUR", "dest": "NEAN", "rate": {"param": 3}}
   parameters:
   - {"ground_truth": 0.00015, "lb": 1e-05, "ub": 0.01, "index": 1}
   - {"ground_truth": 2.5e-05, "lb": 1e-05, "ub": 0.01, "index": 2}
@@ -56,9 +56,7 @@ epochTimeSplit:
 - {"ground_truth": 2040.0, "lb": 1480.0, "ub": 3980.0, "index": 3}
 - {"ground_truth": 5920.0, "lb": 3980.0, "ub": 7910.0, "index": 4}
 - {"ground_truth": 10000.0, "lb": 9000.0, "ub": 12000.0, "index": 5}
-populationConversion:
-- [0, 1, 2]
-- [0, 1, 2]
-- [0, 0, 2]
-- [0, 0, 2]
-- [0, 0, 0]
+admixture:
+  entries:
+  - {"epoch": 3, "ancestral": "AFR", "derived": "EUR", "proportion": 1.0}
+  - {"epoch": 5, "ancestral": "AFR", "derived": "NEAN", "proportion": 1.0}

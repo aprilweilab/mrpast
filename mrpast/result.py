@@ -168,7 +168,9 @@ def load_json_pandas(
         p.update(
             {
                 "label": f"A{acounter}",
-                "Ground Truth": clamp(p, p["ground_truth"]) if not is_fixed else p["init"],
+                "Ground Truth": (
+                    clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                ),
                 "err_low": v - clamp(p, get_interval(p, 0)),
                 "err_hi": clamp(p, get_interval(p, 1)) - v,
                 "Optimized Value": v,

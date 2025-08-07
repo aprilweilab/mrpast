@@ -28,6 +28,7 @@ if(${ENABLE_NATIVE})
     add_compile_options(-mfma)
   endif()
 endif()
+add_compile_options(-g)
 
 set(MRPAST_CORE_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/src/objective.cpp

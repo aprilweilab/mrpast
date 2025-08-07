@@ -665,8 +665,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
         }
 
         ModelProbabilities probabilities = probabilitiesUpToTime(curMatrix, deltaT);
-        // probabilities.coalescence = migrationStateProbsEOPE * probabilities.coalescence(currentStateMap, 0);
-        probabilities.coalescence = migrationStateProbsEOPE * (currentStateMap * probabilities.coalescence);
+        probabilities.coalescence = migrationStateProbsEOPE * probabilities.coalescence;
         TRACE_MATRIX(probabilities.coalescence,
                      "coalescence probabilities in epoch " << currentEpoch << " up to time " << time);
 
@@ -693,9 +692,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
             assert(newEpoch == currentEpoch + 1);
 
             // Map our current location probabilities back to the epoch0 locations.
-            // MatrixXd locProbMappedToEpoch0 = probabilities.locations(currentStateMap, currentStateMap);
-            MatrixXd locProbMappedToEpoch0 = currentStateMap * probabilities.locations * currentStateMap.transpose();
-            locProbMappedToEpoch0.diagonal() = currentStateMap * probabilities.locations.diagonal();
+            MatrixXd locProbMappedToEpoch0 = currentStateMap * probabilities.locations;
             TRACE_MATRIX(locProbMappedToEpoch0, "End of epoch " << currentEpoch << " locs");
             // locProbMappedToEpoch0 contains the location probabilities in terms of
             // the initial states, but only for the time period between the end of the
@@ -710,6 +707,12 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
             }
             TRACE_MATRIX(migrationStateProbsEOPE, " ... normalized and converted to EOPE");
 
+            const auto ASMatrix = createASMatrix(schema, parameters, newEpoch);
+            TRACE_MATRIX(ASMatrix, "ASMatrix(" << newEpoch << ")");
+            currentStateMap = currentStateMap * ASMatrix;
+            TRACE_MATRIX(currentStateMap, "currentStateMap(" << newEpoch << ")");
+            migrationStateProbsEOPE = migrationStateProbsEOPE * currentStateMap;
+
 #if FEWER_SUBTRACTIONS_PER_EPOCH
             probCoalByLastEpoch = ((probCoalByLastEpoch.array() + probabilities.coalescence.array()) -
                                    (probCoalByLastEpoch.array() * probabilities.coalescence.array()))
@@ -722,10 +725,6 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 #endif
 
             epochStart = time;
-            const auto ASMatrix = createASMatrix(schema, parameters, newEpoch);
-            TRACE_MATRIX(ASMatrix, "ASMatrix(" << newEpoch << ")");
-            currentStateMap = currentStateMap * ASMatrix;
-            TRACE_MATRIX(currentStateMap, "currentStateMap(" << newEpoch << ")");
             currentEpoch = newEpoch;
         }
     }
