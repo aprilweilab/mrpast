@@ -105,6 +105,14 @@ struct AdmixtureApplication {
     size_t v2;
 };
 
+struct PulseApplication {
+    double coeff;
+    size_t i;
+    size_t j;
+    size_t pulse_index;
+    std::vector<size_t> variable_indices;
+};
+
 inline bool isJsonParamFixed(const json& parameter) { return (parameter["lb"] == parameter["ub"]); }
 
 /**
@@ -189,7 +197,7 @@ public:
 
     size_t numEpochs() const { return m_numEpochs; }
 
-    size_t totalParams() const { return m_eParamIdx.size() + m_sParamIdx.size() + m_aParamIdx.size(); }
+    size_t totalParams() const { return m_paramRescale.size(); }
 
     size_t numStates(size_t epoch) const { return m_sStates.at(epoch); }
 
@@ -207,7 +215,9 @@ public:
 
     void getBounds(size_t paramIdx, double& lowerBound, double& upperBound) const;
 
-    double getEpochStartTime(double const* parameters, size_t epoch) const;
+    std::vector<double> getEpochStartTimes(double const* parameters) const;
+
+    std::vector<double> getPulseTimes(double const* parameters) const;
 
     template <typename T> void addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data);
 
@@ -216,6 +226,12 @@ public:
     void fromJsonOutput(const json& jsonOutput, double* parameters, std::string key = "final") const;
 
     bool samplesAreJackknifed() const { return m_inputJson["sampling_description"] == "jackknife"; }
+
+    size_t paramStartEpochs() const { return 0; }
+    size_t paramStartSMatrix() const { return paramStartEpochs() + m_eParamIdx.size(); }
+    size_t paramStartAdmix() const { return paramStartSMatrix() + m_sParamIdx.size(); }
+    size_t paramStartPulseTimes() const { return paramStartAdmix() + m_aParamIdx.size(); }
+    size_t paramStartPulseProp() const { return paramStartPulseTimes() + m_ptParamIdx.size(); }
 
     // Parameters and fixed values for epoch times
     VarList m_eParams;
@@ -231,8 +247,23 @@ public:
     std::vector<size_t> m_aFixedIdx;
     std::vector<size_t> m_aOneMinusIdx;
     std::vector<AdmixtureApplication> m_admixtureApps;
+    // Pulse time parameters.
+    VarList m_ptParams;
+    std::vector<size_t> m_ptParamIdx;
+    std::vector<size_t> m_ptFixedIdx;
+    // Pulse proportion parameters
+    VarList m_ppParams;
+    std::vector<size_t> m_ppParamIdx;
+    std::vector<size_t> m_ppFixedIdx;
+    std::vector<size_t> m_ppOneMinusIdx;
+    std::vector<PulseApplication> m_pulseApps;
 
 private:
+    void initParamsViaList(double* parameters,
+                           size_t& index,
+                           const ParameterSchema::VarList& paramVars,
+                           const std::vector<size_t>& paramIdx) const;
+
     // We save the actual JSON object, because the output is identical to the
     // input except for
     // some additional fields. This way we can just copy this JSON object for the

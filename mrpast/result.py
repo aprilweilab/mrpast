@@ -14,7 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 from tabulate import tabulate
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Iterable
+import itertools
 import json
 import math
 import mrpast.model
@@ -33,6 +34,10 @@ except ImportError:
 
 def _param_is_fixed(parameter: Dict[str, Any]) -> bool:
     return parameter["lb"] == parameter["ub"]
+
+
+def _param_is_synthetic(parameter: Dict[str, Any]) -> bool:
+    return parameter["kind_index"] < 0
 
 
 def load_json_pandas(
@@ -433,15 +438,22 @@ def tab_show(filename: str, sort_by: str = "Index"):
     with open(filename) as f:
         output = json.load(f)
 
-    all_params: List[Dict[str, Any]] = (output.get("epoch_times_gen", []) or []) + (
-        (output.get("smatrix_values_ne__gen", []) or [])
-        + (output.get("amatrix_parameters", []) or [])
+    parameter_keys = (
+        "epoch_times_gen",
+        "smatrix_values_ne__gen",
+        "amatrix_parameters",
+        "pulse_times",
+        "pulse_parameters",
+    )
+
+    all_params: Iterable[Dict[str, Any]] = itertools.chain.from_iterable(
+        map(lambda k: output.get(k, []) or [], parameter_keys)
     )
     results = []
     total_rel = 0.0
     total_abs = 0.0
     for param_idx, param in enumerate(all_params):
-        if _param_is_fixed(param):
+        if _param_is_synthetic(param):
             continue
         gt = param["ground_truth"]
         final = param["final"]

@@ -180,6 +180,16 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
                                 source=i,
                                 dest=j,
                             )
+
+    # Add any mass migration (pulse) events
+    for entry in user_model.pulse.entries:
+        demography.add_mass_migration(
+            time=entry.get_sim_time(user_model.pulse),
+            source=entry.source,
+            dest=entry.dest,
+            proportion=entry.get_sim_proportion(user_model.pulse),
+        )
+
     demography.sort_events()
     return demography, active_pops
 

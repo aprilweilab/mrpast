@@ -16,17 +16,18 @@
 import math
 from typing import Dict, Any, Optional
 from mrpast.model import (
-    AdmixtureGroup,
     AdmixtureEntry,
-    UserModel,
+    AdmixtureGroup,
     DEFAULT_PLOIDY,
-    DemeDemeRates,
-    DemeRates,
     DemeDemeEntry,
+    DemeDemeRates,
     DemeRateEntry,
-    SymbolicEpochs,
+    DemeRates,
     FloatParameter,
     ParamRef,
+    PulseGroup,
+    SymbolicEpochs,
+    UserModel,
 )
 
 try:
@@ -49,14 +50,12 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         growth=DemeRates(entries=[], parameters=[]),
         epochs=SymbolicEpochs([]),
         admixture=AdmixtureGroup([], []),
+        pulse=PulseGroup([], []),
     )
     name2deme = {}
 
     with open(demes_file) as f:
         demes_model = demes.load(f)
-    assert (
-        not demes_model.pulses
-    ), "Admixture pulses are not supported in MrPast models yet."
     assert (
         demes_model.time_units == TIME_UNIT_GENS
     ), "Only time_units supported is generations"
@@ -167,6 +166,11 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
                 )
             )
             e_idx = (e_idx + 1) if (e_idx + 1) < len(epochs_by_start) else None
+
+    # Pulse events
+    assert (
+        not demes_model.pulses
+    ), "Admixture pulses are not supported in MrPast models yet."
 
     next_lb = 100.0
     epoch_times = list(epochs_by_start.keys())

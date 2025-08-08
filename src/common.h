@@ -85,6 +85,9 @@ constexpr const char* OBSERVATION_MODE_KEY = "observation_mode";
 constexpr const char* SAMPLING_HASHES_KEY = "sampling_hashes";
 constexpr const char* AMATRIX_PARAMS_KEY = "amatrix_parameters";
 constexpr const char* AMATRIX_APPS_KEY = "amatrix_applications";
+constexpr const char* PULSE_PARAMS_KEY = "pulse_parameters";
+constexpr const char* PULSE_APPS_KEY = "pulse_applications";
+constexpr const char* PULSE_TIMES_KEY = "pulse_times";
 
 // The minimum value that we use in any computations, the square-root of the
 // minimum representable floating point value.
