@@ -460,20 +460,22 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
     }
     RELEASE_ASSERT(i == m_aParams.size());
 
-    RELEASE_ASSERT(output.at(PULSE_TIMES_KEY).size() == m_ptParams.size());
-    i = 0;
-    std::vector<double> pulseTimes = getPulseTimes(parameters);
-    for (auto& parameter : output.at(PULSE_TIMES_KEY)) {
-        parameter["final"] = pulseTimes.at(i);
-        i++;
-    }
+    if (output.contains(PULSE_TIMES_KEY)) {
+        RELEASE_ASSERT(output.at(PULSE_TIMES_KEY).size() == m_ptParams.size());
+        i = 0;
+        std::vector<double> pulseTimes = getPulseTimes(parameters);
+        for (auto& parameter : output.at(PULSE_TIMES_KEY)) {
+            parameter["final"] = pulseTimes.at(i);
+            i++;
+        }
 
-    RELEASE_ASSERT(output.at(PULSE_PARAMS_KEY).size() == m_ppParams.size());
-    i = 0;
-    std::vector<double> pulseProps = getAllPulseValues(*this, parameters);
-    for (auto& parameter : output.at(PULSE_PARAMS_KEY)) {
-        parameter["final"] = pulseProps.at(i);
-        i++;
+        RELEASE_ASSERT(output.at(PULSE_PARAMS_KEY).size() == m_ppParams.size());
+        i = 0;
+        std::vector<double> pulseProps = getAllPulseValues(*this, parameters);
+        for (auto& parameter : output.at(PULSE_PARAMS_KEY)) {
+            parameter["final"] = pulseProps.at(i);
+            i++;
+        }
     }
 
     output["negLL"] = negLL;
@@ -659,9 +661,9 @@ ModelProbabilities probabilitiesUpToTime(const MatrixXd& sMatrix, const double t
     // - Sum to 1 (approximately, there will be floating pt error)
     // - Have no cell < 0
     // - Have no cell > 1
-    auto intermediate = sMatrix * timeK;
+    const MatrixXd intermediate = sMatrix * timeK;
     TRACE_MATRIX(intermediate, "exponential parameter @ t=" << timeK);
-    MatrixXd stateProbabilities = intermediate.exp();
+    const MatrixXd stateProbabilities = intermediate.exp();
     TRACE_MATRIX(stateProbabilities, "State probability @ t=" << timeK);
     const size_t N = stateProbabilities.cols(); // NxN matrix
     return {stateProbabilities.block(0, 0, N - 1, N - 1), stateProbabilities.topRightCorner(N - 1, 1)};

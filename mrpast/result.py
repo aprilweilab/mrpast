@@ -453,7 +453,7 @@ def tab_show(filename: str, sort_by: str = "Index"):
     total_rel = 0.0
     total_abs = 0.0
     for param_idx, param in enumerate(all_params):
-        if _param_is_synthetic(param):
+        if _param_is_synthetic(param) or _param_is_fixed(param):
             continue
         gt = param["ground_truth"]
         final = param["final"]
