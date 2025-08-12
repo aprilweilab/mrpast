@@ -738,6 +738,12 @@ inline std::vector<TimeMarker> combineTimeVectors(const std::vector<double>& tim
     return std::move(result);
 }
 
+static inline void rowNorm(MatrixXd& matrix) {
+    for (Eigen::Index j = 0; j < matrix.rows(); j++) {
+        matrix.row(j).array() /= matrix.row(j).sum();
+    }
+}
+
 /**
  * Given concrete matrices and vectors (so the symbolic ones have been populated
  * by the current parameter values), compute the probabilities.
@@ -762,20 +768,14 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
     // fewer states we always have to map them back to Epoch0's states.
     const Eigen::Index nStatesEpoch0 = SIZE_T_TO_INDEX(schema.numStates(0)) - 1;
 
-    // Maps the current epoch's states back to Epoch0. E.g., if position "i" has
-    // value "k", it means that state "k" in the current epoch maps back to state
-    // "i" in Epoch0.
-    const double minPop = 0;
-    const double maxPop = (double)nStatesEpoch0 - 1;
-    // VectorXd currentStateMap = VectorXd::LinSpaced(nStatesEpoch0, minPop, maxPop);
+    // Maps the current epoch's states back to Epoch0, in proportions.
     MatrixXd currentStateMap = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
     // Resulting coalescence probabilities per time slice
     const Eigen::Index nTimeBins = SIZE_T_TO_INDEX(timeSlices.size()) + 1;
     MatrixXd probsByTime = MatrixXd::Ones(nStatesEpoch0, nTimeBins);
     // The probability of non-coalescence states at the end of the previous epoch.
-    // This is the "starting state" of the current epoch. EOPE = "end of previous
-    // epoch"
-    MatrixXd migrationStateProbsEOPE = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
+    // This is the "starting state" of the current epoch, and is updated at the end of each epoch.
+    MatrixXd currentStateProbs = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
 #if FEWER_SUBTRACTIONS_PER_EPOCH
     // The probability that a state has coalesced by the end of the last epoch.
     VectorXd probCoalByLastEpoch = VectorXd::Zero(nStatesEpoch0);
@@ -801,7 +801,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
         }
 
         ModelProbabilities probabilities = probabilitiesUpToTime(curMatrix, deltaT);
-        probabilities.coalescence = migrationStateProbsEOPE * probabilities.coalescence;
+        probabilities.coalescence = currentStateProbs * probabilities.coalescence;
         TRACE_MATRIX(probabilities.coalescence,
                      "coalescence probabilities in epoch " << currentEpoch << " up to time " << time);
 
@@ -826,11 +826,8 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
         // If there is a pulse of admixture here, apply it.
         if (allTimes[i].isPulse) {
             MatrixXd APMatrix = createPulseMatrix(schema, allPulseValues, allTimes[i].pulseIndex);
-            // TODO: should change the name from "EOPE" (end of previous epoch) to "currentStateProbs"
-            // or something, if this is correct.
-            // It feels like it might be cleaner to apply to currentStateMap and have that be multiplied
-            // by the coal probabilities above?
-            migrationStateProbsEOPE = migrationStateProbsEOPE * APMatrix;
+            currentStateProbs = currentStateProbs * APMatrix;
+            rowNorm(currentStateProbs); // Normalize each row to be a probability.
         }
 
         // The epoch has changed, update all the intermediate mappings/values
@@ -845,19 +842,16 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
             // previous epoch (E_k) and the start of the current time slice (which is
             // the start of a new epoch, E_k+2). This reweights all the migration
             // states based on the location probabilities at the end of E_k.
-            migrationStateProbsEOPE = migrationStateProbsEOPE * locProbMappedToEpoch0;
-            TRACE_MATRIX(migrationStateProbsEOPE, " ... multiplied by end of previous epoch");
-            // Normalize each row to be a probability.
-            for (Eigen::Index j = 0; j < migrationStateProbsEOPE.rows(); j++) {
-                migrationStateProbsEOPE.row(j).array() /= migrationStateProbsEOPE.row(j).sum();
-            }
-            TRACE_MATRIX(migrationStateProbsEOPE, " ... normalized and converted to EOPE");
+            currentStateProbs = currentStateProbs * locProbMappedToEpoch0;
+            TRACE_MATRIX(currentStateProbs, " ... multiplied by end of previous epoch");
+            rowNorm(currentStateProbs); // Normalize each row to be a probability.
+            TRACE_MATRIX(currentStateProbs, " ... normalized and converted to EOPE");
 
             const auto ASMatrix = createASMatrix(schema, parameters, newEpoch);
             TRACE_MATRIX(ASMatrix, "ASMatrix(" << newEpoch << ")");
             currentStateMap = currentStateMap * ASMatrix;
             TRACE_MATRIX(currentStateMap, "currentStateMap(" << newEpoch << ")");
-            migrationStateProbsEOPE = migrationStateProbsEOPE * currentStateMap;
+            currentStateProbs = currentStateProbs * currentStateMap;
 
 #if FEWER_SUBTRACTIONS_PER_EPOCH
             probCoalByLastEpoch = ((probCoalByLastEpoch.array() + probabilities.coalescence.array()) -

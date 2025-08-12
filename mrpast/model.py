@@ -947,22 +947,25 @@ def construct_pulse(model: UserModel, init_from_ground_truth: bool):
         one_minus_p_ij_idx = next_param_index + 1
 
         # Just simplifies the code by symbolizing a state as "a", "b", or "c",
-        # where "a" is the ancestral deme (backward in time dest), "b" is the derived deme (backward in time source),
+        # where "a" is the derived deme (backward in time source), "b" is the ancestral deme (backward in time dest),
         # and "c" is something else. The output pair is always in order a<b<c
         def state_to_symbol(deme0, deme1):
-            if deme0 == entry.dest:
+            mapping = {}
+            if deme0 == entry.source:
                 r0 = "a"
-            elif deme0 == entry.source:
+            elif deme0 == entry.dest:
                 r0 = "b"
             else:
                 r0 = "c"
-            if deme1 == entry.dest:
+            if deme1 == entry.source:
                 r1 = "a"
-            elif deme1 == entry.source:
+            elif deme1 == entry.dest:
                 r1 = "b"
             else:
                 r1 = "c"
-            return tuple(sorted([r0, r1]))
+            mapping[r0] = deme0
+            mapping[r1] = deme1
+            return tuple(sorted([r0, r1])), mapping
 
         # Map from state transitions (left is from state, right is to state) to parameter application for
         # that scenario.
@@ -993,10 +996,17 @@ def construct_pulse(model: UserModel, init_from_ground_truth: bool):
         all_states = model.get_ordered_states()
         for from_state, (i, j) in enumerate(all_states):
             for to_state, (k, l) in enumerate(all_states):
-                symbolic_pair = (state_to_symbol(i, j), state_to_symbol(k, l))
-                template = state_transitions.get(symbolic_pair)
+                pair1, mapping1 = state_to_symbol(i, j)
+                pair2, mapping2 = state_to_symbol(k, l)
+                template = state_transitions.get((pair1, pair2))
                 if template is not None:
                     app = deepcopy(template)
+                    # In the above mappings, "c" can get bound to different variables, but the template
+                    # only applies when they are the _same_.
+                    assert pair1[0] != "c" and pair2[0] != "c"
+                    if pair1[1] == "c" and pair2[1] == "c":
+                        if mapping1["c"] != mapping2["c"]:
+                            continue
                     app.i = from_state
                     app.j = to_state
                     pulse_apps.append(app)

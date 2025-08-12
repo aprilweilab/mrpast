@@ -185,6 +185,53 @@ def load_json_pandas(
             }
         )
         result.append(p)
+    for ptcount, p in enumerate(data["pulse_times"]):
+        v = clamp(p, p["final"])
+        del p["apply_to"]
+        if "one_minus" in p:
+            del p["one_minus"]
+        is_fixed = _param_is_fixed(p)
+        if (is_fixed and skip_fixed) or _param_is_synthetic(p):
+            continue
+        p.update(
+            {
+                "label": f"PT{ptcount}",
+                "Ground Truth": (
+                    clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                ),
+                "err_low": v - clamp(p, get_interval(p, 0)),
+                "err_hi": clamp(p, get_interval(p, 1)) - v,
+                "Optimized Value": v,
+                "Parameter Type": "Pulse time",
+                "Epochs": [],  # TODO
+                "Fixed": is_fixed,
+            }
+        )
+        result.append(p)
+    for ppcount, p in enumerate(data["pulse_parameters"]):
+        v = clamp(p, p["final"])
+        del p["apply_to"]
+        if "one_minus" in p:
+            del p["one_minus"]
+        is_fixed = _param_is_fixed(p)
+        if (is_fixed and skip_fixed) or _param_is_synthetic(p):
+            continue
+        p.update(
+            {
+                "label": f"PP{ptcount}",
+                "Ground Truth": (
+                    clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                ),
+                "err_low": v - clamp(p, get_interval(p, 0)),
+                "err_hi": clamp(p, get_interval(p, 1)) - v,
+                "Optimized Value": v,
+                "Parameter Type": "Pulse proportion",
+                "Epochs": [],  # TODO
+                "Fixed": is_fixed,
+            }
+        )
+        result.append(p)
+
     return pd.DataFrame.from_dict(result)
 
 
