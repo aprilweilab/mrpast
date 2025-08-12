@@ -13,6 +13,11 @@ THISDIR = os.path.dirname(os.path.realpath(__file__))
 MODEL_5D1E = os.path.join(THISDIR, "..", "examples", "5deme1epoch.yaml")
 MODEL_OOA3 = os.path.join(THISDIR, "..", "examples", "ooa_3g09.yaml")
 
+try:
+    MRPAST = [subprocess.check_output(["which", "mrpast"]).decode("utf-8").strip()]
+except subprocess.CalledProcessError:
+    MRPAST = ["python", "mrpast/main.py"]
+
 
 class EndToEndTests(unittest.TestCase):
     def simulate(self, model_file: str, tmpdirname: str):
@@ -20,8 +25,8 @@ class EndToEndTests(unittest.TestCase):
         command = list(
             map(
                 str,
-                [
-                    "mrpast",
+                MRPAST
+                + [
                     "simulate",
                     "--replicates",
                     1,
