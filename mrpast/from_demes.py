@@ -25,7 +25,6 @@ from mrpast.model import (
     DemeRates,
     FloatParameter,
     ParamRef,
-    PulseGroup,
     SymbolicEpochs,
     UserModel,
 )
@@ -50,7 +49,6 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         growth=DemeRates(entries=[], parameters=[]),
         epochs=SymbolicEpochs([]),
         admixture=AdmixtureGroup([], []),
-        pulse=PulseGroup([], []),
     )
     name2deme = {}
 

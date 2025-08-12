@@ -240,24 +240,7 @@ void ParameterSchema::load(const json& inputData) {
             application["vars"].at(1),
         });
     }
-    // PULSE TIMES
-    if (inputData.contains(PULSE_TIMES_KEY)) {
-        loadParamList(inputData.at(PULSE_TIMES_KEY), m_ptParams, m_ptParamIdx, m_ptFixedIdx, ignored, m_paramRescale);
-        // PULSE MATRIX PARAMETERS
-        loadParamList(
-            inputData.at(PULSE_PARAMS_KEY), m_ppParams, m_ppParamIdx, m_ppFixedIdx, m_ppOneMinusIdx, m_paramRescale);
-        for (const auto& application : inputData.at(PULSE_APPS_KEY)) {
-            m_pulseApps.push_back({
-                application["coeff"],
-                application["i"],
-                application["j"],
-                application["pulse_index"],
-                application["vars"],
-            });
-        }
-    }
-    const size_t paramCount =
-        (m_sParamIdx.size() + m_eParamIdx.size() + m_aParamIdx.size() + m_ptParamIdx.size() + m_ppParamIdx.size());
+    const size_t paramCount = (m_sParamIdx.size() + m_eParamIdx.size() + m_aParamIdx.size());
     RELEASE_ASSERT(paramCount == m_paramRescale.size());
 }
 
@@ -308,20 +291,10 @@ void ParameterSchema::initParamVector(double* parameters) const {
     initParamsViaList(parameters, p, m_eParams, m_eParamIdx);
     initParamsViaList(parameters, p, m_sParams, m_sParamIdx);
     initParamsViaList(parameters, p, m_aParams, m_aParamIdx);
-    initParamsViaList(parameters, p, m_ptParams, m_ptParamIdx);
-    initParamsViaList(parameters, p, m_ppParams, m_ppParamIdx);
 }
 
 void ParameterSchema::getBounds(size_t paramIdx, double& lowerBound, double& upperBound) const {
-    if (paramIdx >= paramStartPulseProp()) {
-        const size_t index = m_ppParamIdx.at(paramIdx - paramStartPulseProp());
-        lowerBound = toParam(m_ppParams.at(index).lb, paramIdx);
-        upperBound = toParam(m_ppParams.at(index).ub, paramIdx);
-    } else if (paramIdx >= paramStartPulseTimes()) {
-        const size_t index = m_ptParamIdx.at(paramIdx - paramStartPulseTimes());
-        lowerBound = toParam(m_ptParams.at(index).lb, paramIdx);
-        upperBound = toParam(m_ptParams.at(index).ub, paramIdx);
-    } else if (paramIdx >= paramStartAdmix()) {
+    if (paramIdx >= paramStartAdmix()) {
         const size_t index = m_aParamIdx.at(paramIdx - paramStartAdmix());
         lowerBound = toParam(m_aParams.at(index).lb, paramIdx);
         upperBound = toParam(m_aParams.at(index).ub, paramIdx);
@@ -344,22 +317,6 @@ std::vector<double> ParameterSchema::getEpochStartTimes(double const* parameters
     }
     for (size_t epochIndex : m_eFixedIdx) {
         result.at(epochIndex) = m_eParams[epochIndex].init;
-    }
-    return std::move(result);
-}
-
-std::vector<double> ParameterSchema::getPulseTimes(double const* parameters) const {
-    std::vector<double> result(m_ptParams.size());
-    const size_t firstParamIdx = paramStartPulseTimes();
-
-    for (size_t i = 0; i < m_ptParamIdx.size(); i++) {
-        const size_t ptIndex = m_ptParamIdx[i];
-        const size_t paramIndex = firstParamIdx + i;
-        RELEASE_ASSERT(paramIndex < totalParams());
-        result.at(ptIndex) = fromParam(parameters[paramIndex], i);
-    }
-    for (size_t ptIndex : m_ptFixedIdx) {
-        result.at(ptIndex) = m_ptParams[ptIndex].init;
     }
     return std::move(result);
 }
@@ -389,33 +346,6 @@ std::vector<double> getAdmixtureValues(const ParameterSchema& schema, double con
         admixtureValues.at(index) = 1.0 - sum;
     }
     return std::move(admixtureValues);
-}
-
-std::vector<double> getAllPulseValues(const ParameterSchema& schema, double const* parameters) {
-    // Copy all of the parameter and fixed values into the admixture value vector.
-    const size_t firstParamIdx = schema.paramStartPulseProp();
-
-    std::vector<double> pulseValues(schema.m_ppParams.size());
-    // Copy parameters from the solver input
-    size_t paramIdx = firstParamIdx;
-    for (const size_t index : schema.m_ppParamIdx) {
-        RELEASE_ASSERT(paramIdx < schema.totalParams());
-        pulseValues.at(index) = schema.fromParam(parameters[paramIdx], paramIdx);
-        paramIdx++;
-    }
-    // Populate the fixed values
-    for (const size_t index : schema.m_ppFixedIdx) {
-        pulseValues.at(index) = schema.m_ppParams.at(index).init;
-    }
-    // Populate the "one-minus" values (parameters determined by other parameters)
-    for (const size_t index : schema.m_ppOneMinusIdx) {
-        double sum = 0.0;
-        for (const size_t otherIndex : schema.m_ppParams.at(index).oneMinus) {
-            sum += pulseValues.at(otherIndex);
-        }
-        pulseValues.at(index) = 1.0 - sum;
-    }
-    return std::move(pulseValues);
 }
 
 json ParameterSchema::toJsonOutput(const double* parameters, const double negLL) const {
@@ -459,24 +389,6 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
         i++;
     }
     RELEASE_ASSERT(i == m_aParams.size());
-
-    if (output.contains(PULSE_TIMES_KEY)) {
-        RELEASE_ASSERT(output.at(PULSE_TIMES_KEY).size() == m_ptParams.size());
-        i = 0;
-        std::vector<double> pulseTimes = getPulseTimes(parameters);
-        for (auto& parameter : output.at(PULSE_TIMES_KEY)) {
-            parameter["final"] = pulseTimes.at(i);
-            i++;
-        }
-
-        RELEASE_ASSERT(output.at(PULSE_PARAMS_KEY).size() == m_ppParams.size());
-        i = 0;
-        std::vector<double> pulseProps = getAllPulseValues(*this, parameters);
-        for (auto& parameter : output.at(PULSE_PARAMS_KEY)) {
-            parameter["final"] = pulseProps.at(i);
-            i++;
-        }
-    }
 
     output["negLL"] = negLL;
     return std::move(output);
@@ -606,39 +518,6 @@ MatrixXd createASMatrix(const ParameterSchema& schema, double const* parameters,
     return std::move(ASMatrix);
 }
 
-MatrixXd
-createPulseMatrix(const ParameterSchema& schema, const std::vector<double>& allPulseValues, size_t pulseIndex) {
-    // Now apply these values to construct the matrix, we leave off the coalescence state.
-    const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(0) - 1);
-    MatrixXd APMatrix = MatrixXd::Zero(nStates, nStates);
-    size_t observed = 0;
-    for (const auto& app : schema.m_pulseApps) {
-        if (app.pulse_index == pulseIndex) {
-            observed++;
-            double prod = 1.0;
-            for (const size_t paramIndex : app.variable_indices) {
-                prod *= allPulseValues[paramIndex];
-            }
-            APMatrix(SIZE_T_TO_INDEX(app.i), SIZE_T_TO_INDEX(app.j)) += app.coeff * prod;
-        }
-    }
-    RELEASE_ASSERT(observed > 0);
-    // TODO: make this consistent with the admixture approach. Either do this for both, or use the
-    // constants in the model emitted for the pulse matrix as well.
-    for (Eigen::Index i = 0; i < APMatrix.rows(); i++) {
-        const double sum = APMatrix.row(i).sum();
-        if (sum == 0.0) {
-            APMatrix(i, i) = 1;
-        } else {
-            RELEASE_ASSERT(abs(1.0 - sum) < 1.0e-6);
-        }
-    }
-#ifndef NDEBUG
-    verifyASMatrix(APMatrix);
-#endif
-    return std::move(APMatrix);
-}
-
 inline size_t numTimeSlices(const std::vector<double>& timeSlices) { return timeSlices.size() + 1; }
 
 struct ModelProbabilities {
@@ -676,16 +555,13 @@ struct TimeMarker {
     double time;
     size_t epoch;
     bool isSlice;
-    bool isPulse;
-    size_t pulseIndex;
 };
 
 // Takes two vectors, one for time slice and one for epochs, and outputs a
 // vector of objects indicating what kind of time marker it is (a time slice, or
 // epoch boundary?) and which Epoch it belongs to.
 inline std::vector<TimeMarker> combineTimeVectors(const std::vector<double>& timeSlices,
-                                                  const std::vector<double>& epochTimes,
-                                                  const std::vector<double>& pulseTimes) {
+                                                  const std::vector<double>& epochTimes) {
     std::vector<TimeMarker> tsAndEpoch;
     size_t epochCounter = 0;
     {
@@ -693,52 +569,25 @@ inline std::vector<TimeMarker> combineTimeVectors(const std::vector<double>& tim
         size_t posE = 0;
         while (posT < timeSlices.size() || posE < epochTimes.size()) {
             if (posT >= timeSlices.size()) {
-                tsAndEpoch.push_back({epochTimes[posE], ++epochCounter, false, false, 0});
+                tsAndEpoch.push_back({epochTimes[posE], ++epochCounter, false});
                 posE++;
             } else if (posE >= epochTimes.size()) {
-                tsAndEpoch.push_back({timeSlices[posT], epochCounter, true, false, 0});
+                tsAndEpoch.push_back({timeSlices[posT], epochCounter, true});
                 posT++;
             } else if (timeSlices[posT] < epochTimes[posE]) {
-                tsAndEpoch.push_back({timeSlices[posT], epochCounter, true, false, 0});
+                tsAndEpoch.push_back({timeSlices[posT], epochCounter, true});
                 posT++;
             } else if (timeSlices[posT] == epochTimes[posE]) {
-                tsAndEpoch.push_back({timeSlices[posT], ++epochCounter, true, false, 0});
+                tsAndEpoch.push_back({timeSlices[posT], ++epochCounter, true});
                 posT++;
                 posE++;
             } else {
-                tsAndEpoch.push_back({epochTimes[posE], ++epochCounter, false, false, 0});
+                tsAndEpoch.push_back({epochTimes[posE], ++epochCounter, false});
                 posE++;
             }
         }
     }
-    std::vector<TimeMarker> result;
-    {
-        size_t posTE = 0;
-        size_t posP = 0;
-        size_t pulseCounter = 0;
-        while (posTE < tsAndEpoch.size() || posP < pulseTimes.size()) {
-            if (posTE >= tsAndEpoch.size()) {
-                result.push_back({pulseTimes[posP], epochCounter, false, true, pulseCounter++});
-                posP++;
-            } else if (posP >= pulseTimes.size()) {
-                result.push_back(tsAndEpoch[posTE]);
-                posTE++;
-            } else if (tsAndEpoch[posTE].time < epochTimes[posP]) {
-                result.push_back(tsAndEpoch[posTE]);
-                posTE++;
-            } else if (tsAndEpoch[posTE].time == pulseTimes[posP]) {
-                result.push_back(
-                    {tsAndEpoch[posTE].time, tsAndEpoch[posTE].epoch, tsAndEpoch[posTE].isSlice, true, pulseCounter++});
-                posTE++;
-                posP++;
-            } else {
-                const size_t currentEpoch = (posTE == 0) ? 0 : tsAndEpoch[posTE - 1].epoch;
-                result.push_back({pulseTimes[posP], currentEpoch, false, true, pulseCounter++});
-                posP++;
-            }
-        }
-    }
-    return std::move(result);
+    return std::move(tsAndEpoch);
 }
 
 static inline void rowNorm(MatrixXd& matrix) {
@@ -755,14 +604,13 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
                                   double const* parameters,
                                   const std::vector<double>& timeSlices,
                                   const std::vector<double>& epochTimes,
-                                  const std::vector<double>& pulseTimes,
                                   std::vector<std::pair<double, MatrixXd>>* qMatricesByTime = nullptr) {
     const size_t numEpochs = schema.numEpochs();
     assert(numEpochs > 0);
     assert(numEpochs == epochTimes.size() + 1);
 
     // Combine all the times into a single timeline just to simplify things.
-    std::vector<TimeMarker> allTimes = combineTimeVectors(timeSlices, epochTimes, pulseTimes);
+    std::vector<TimeMarker> allTimes = combineTimeVectors(timeSlices, epochTimes);
 
     // Epoch0 is special. The number of states in this epoch corresponds with the
     // concrete data that we have, which we need _ALL_ model probabilities to fit
@@ -787,8 +635,6 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
     // epoch.
     VectorXd probNotCoalByLastEpoch = VectorXd::Ones(nStatesEpoch0);
 #endif
-
-    std::vector<double> allPulseValues = getAllPulseValues(schema, parameters);
 
     size_t currentEpoch = 0;
     Eigen::Index currentSlice = 0;
@@ -824,13 +670,6 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 #endif
             TRACE_MATRIX(probsByTime.col(currentSlice), "CDF coalescence for time " << time);
             currentSlice++;
-        }
-
-        // If there is a pulse of admixture here, apply it.
-        if (allTimes[i].isPulse) {
-            const MatrixXd APMatrix = createPulseMatrix(schema, allPulseValues, allTimes[i].pulseIndex);
-            currentStateProbs = currentStateProbs * APMatrix;
-            rowNorm(currentStateProbs); // Normalize each row to be a probability.
         }
 
         // The epoch has changed, update all the intermediate mappings/values
@@ -1011,11 +850,9 @@ inline double computeLLForTime(Eigen::Index timeK, const MatrixXd& probabilityAt
 double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
     // One for each transition between epochs
     std::vector<double> epochTimes = m_schema.getEpochStartTimes(parameters);
-    std::vector<double> pulseTimes = m_schema.getPulseTimes(parameters);
     double cost = 0.0;
     try {
-        auto probabilityAtTime =
-            modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, pulseTimes);
+        auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
         RELEASE_ASSERT(m_cache->isSet);
         for (Eigen::Index timeK = 0; timeK < probabilityAtTime.cols(); timeK++) {
             const double ll = computeLLForTime(timeK, probabilityAtTime, m_cache->matrix);
@@ -1053,10 +890,8 @@ double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
 
 void NegLogLikelihoodCostFunctor::outputTheoreticalCoalMatrix(double const* parameters, std::ostream& out) const {
     std::vector<double> epochTimes = m_schema.getEpochStartTimes(parameters);
-    std::vector<double> pulseTimes = m_schema.getPulseTimes(parameters);
 
-    auto probabilityAtTime =
-        modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, pulseTimes);
+    auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
 
     json outputJson = m_schema.toJsonOutput(parameters, std::numeric_limits<double>::quiet_NaN());
     std::vector<std::vector<double>> matrix;

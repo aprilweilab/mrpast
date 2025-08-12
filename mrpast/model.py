@@ -50,8 +50,6 @@ class ParameterKind(str, Enum):
     PARAM_KIND_COAL = "coalescence"
     PARAM_KIND_GROWTH = "growth"
     PARAM_KIND_ADMIXTURE = "admixture"
-    PARAM_KIND_PULSE = "pulse"
-    PARAM_KIND_PULSE_TIME = "pulse_time"
     PARAM_KIND_EPOCH = "epoch"
 
 
@@ -179,19 +177,6 @@ class AdmixtureApplication:
     i: int
     j: int
     epoch: int
-    vars: List[int]
-
-
-# Applies multiple parameters to the admixture pulse matrix, like:
-#     A[i, j] += (coeff * parameters[v1] * parameters[v2] * ...)
-# where parameters is the ordered list of BoundedVariable for pulses.
-@dataclass_json
-@dataclass
-class PulseApplication:
-    coeff: float
-    i: int
-    j: int
-    pulse_index: int
     vars: List[int]
 
 
@@ -453,54 +438,6 @@ class AdmixtureGroup(ParamContainer):
         return ParamContainer._from_config(config_entry, AdmixtureEntry, AdmixtureGroup)
 
 
-@dataclass_json
-@dataclass
-class PulseEntry:
-    source: Union[int, str]
-    dest: Union[int, str]
-    proportion: Union[float, ParamRef]
-    time: Union[int, ParamRef]
-
-    def resolve_names(self, name2index: Dict[str, int]):
-        if isinstance(self.source, str):
-            self.source = resolve_name(self.source, name2index)
-        if isinstance(self.dest, str):
-            self.dest = resolve_name(self.dest, name2index)
-
-    def unresolve_names(self, names: List[str]):
-        if isinstance(self.source, int):
-            self.source = names[self.source]
-        if isinstance(self.dest, int):
-            self.dest = names[self.dest]
-
-    def get_sim_proportion(self, group: "PulseGroup") -> float:
-        if isinstance(self.proportion, ParamRef):
-            return group.get_parameter(self.proportion.param).ground_truth
-        return float(self.proportion)
-
-    def get_sim_time(self, group: "PulseGroup") -> int:
-        if isinstance(self.time, ParamRef):
-            return int(group.get_parameter(self.time.param).ground_truth)
-        return int(self.time)
-
-
-@dataclass
-class PulseGroup(ParamContainer):
-    entries: List[PulseEntry]
-    parameters: List[FloatParameter]
-
-    @property
-    def max_deme(self) -> int:
-        return max(
-            max(map(lambda e: int(e.source), self.entries)),
-            max(map(lambda e: int(e.dest), self.entries)),
-        )
-
-    @staticmethod
-    def from_config(config_entry: Dict[str, Any]) -> "PulseGroup":
-        return ParamContainer._from_config(config_entry, PulseEntry, PulseGroup)
-
-
 @dataclass
 class UserModel:
     ploidy: int
@@ -511,7 +448,6 @@ class UserModel:
     epochs: SymbolicEpochs
     growth: DemeRates
     admixture: AdmixtureGroup
-    pulse: PulseGroup
 
     # TODO: validation
     # 1. admixture proportions should sum to 1 (all const or all symbolic)
@@ -539,7 +475,6 @@ class UserModel:
             pop_names = [f"pop_{i}" for i in range(pop_count)]
         ploidy = int(config.get("ploidy", DEFAULT_PLOIDY))
         admixture = AdmixtureGroup.from_config(config.get("admixture", {}))
-        pulse = PulseGroup.from_config(config.get("pulse", {}))
 
         result = UserModel(
             ploidy=ploidy,
@@ -550,7 +485,6 @@ class UserModel:
             epochs=epochs,
             growth=grow,
             admixture=admixture,
-            pulse=pulse,
         )
         result.resolve_names()
 
@@ -586,14 +520,12 @@ class UserModel:
         self.coalescence.resolve_names(name2index)
         self.growth.resolve_names(name2index)
         self.admixture.resolve_names(name2index)
-        self.pulse.resolve_names(name2index)
 
     def unresolve_names(self):
         self.migration.unresolve_names(self.pop_names)
         self.coalescence.unresolve_names(self.pop_names)
         self.growth.unresolve_names(self.pop_names)
         self.admixture.unresolve_names(self.pop_names)
-        self.pulse.unresolve_names(self.pop_names)
 
     @property
     def num_epochs(self) -> int:
@@ -906,114 +838,6 @@ def construct_admixture(model: UserModel, init_from_ground_truth: bool):
     return amatrix_params, amatrix_apps
 
 
-def construct_pulse(model: UserModel, init_from_ground_truth: bool):
-    pulse_params: List[BoundedVariable] = []
-    pulse_apps = []
-
-    for pulse_index, entry in enumerate(model.pulse.entries):
-        next_param_index = len(pulse_params)
-        if isinstance(entry.proportion, ParamRef):
-            p_ij = BoundedVariable.from_float_parameter(
-                model.pulse.get_parameter(entry.proportion.param),
-                ParameterKind.PARAM_KIND_PULSE,
-                entry.proportion.param,
-                not init_from_ground_truth,
-                f"Pulse proportion between {model.pop_names[int(entry.dest)]} and {model.pop_names[int(entry.source)]}",
-            )
-            one_minus_p_ij = BoundedVariable.from_float_parameter(
-                model.pulse.get_parameter(entry.proportion.param),
-                ParameterKind.PARAM_KIND_PULSE,
-                -1,
-                not init_from_ground_truth,
-                f"Synthetic variable for pulse between {model.pop_names[int(entry.dest)]} and {model.pop_names[int(entry.source)]}",
-                one_minus=[next_param_index],
-            )
-        else:
-            p_ij = BoundedVariable.from_float_value(
-                float(entry.proportion),
-                ParameterKind.PARAM_KIND_PULSE,
-                -1,
-                f"Fixed pulse proportion between {model.pop_names[int(entry.dest)]} and {model.pop_names[int(entry.source)]}",
-            )
-            one_minus_p_ij = BoundedVariable.from_float_value(
-                1.0 - float(entry.proportion),
-                ParameterKind.PARAM_KIND_PULSE,
-                -1,
-                f"Synthetic variable for pulse between {model.pop_names[int(entry.dest)]} and {model.pop_names[int(entry.source)]}",
-            )
-        pulse_params.append(p_ij)
-        pulse_params.append(one_minus_p_ij)
-        p_ij_idx = next_param_index
-        one_minus_p_ij_idx = next_param_index + 1
-
-        # Just simplifies the code by symbolizing a state as "a", "b", or "c",
-        # where "a" is the derived deme (backward in time source), "b" is the ancestral deme (backward in time dest),
-        # and "c" is something else. The output pair is always in order a<b<c
-        def state_to_symbol(deme0, deme1):
-            mapping = {}
-            if deme0 == entry.source:
-                r0 = "a"
-            elif deme0 == entry.dest:
-                r0 = "b"
-            else:
-                r0 = "c"
-            if deme1 == entry.source:
-                r1 = "a"
-            elif deme1 == entry.dest:
-                r1 = "b"
-            else:
-                r1 = "c"
-            mapping[r0] = deme0
-            mapping[r1] = deme1
-            return tuple(sorted([r0, r1])), mapping
-
-        # Map from state transitions (left is from state, right is to state) to parameter application for
-        # that scenario.
-        state_transitions = {
-            (("a", "a"), ("a", "a")): PulseApplication(
-                1, -1, -1, pulse_index, [one_minus_p_ij_idx, one_minus_p_ij_idx]
-            ),
-            (("a", "a"), ("a", "b")): PulseApplication(
-                2, -1, -1, pulse_index, [p_ij_idx, one_minus_p_ij_idx]
-            ),
-            (("a", "a"), ("b", "b")): PulseApplication(
-                1, -1, -1, pulse_index, [p_ij_idx, p_ij_idx]
-            ),
-            (("a", "b"), ("a", "b")): PulseApplication(
-                1, -1, -1, pulse_index, [one_minus_p_ij_idx]
-            ),
-            (("a", "b"), ("b", "b")): PulseApplication(
-                1, -1, -1, pulse_index, [p_ij_idx]
-            ),
-            (("a", "c"), ("b", "c")): PulseApplication(
-                1, -1, -1, pulse_index, [p_ij_idx]
-            ),
-            (("a", "c"), ("a", "c")): PulseApplication(
-                1, -1, -1, pulse_index, [one_minus_p_ij_idx]
-            ),
-        }
-
-        all_states = model.get_ordered_states()
-        for from_state, (i, j) in enumerate(all_states):
-            for to_state, (k, l) in enumerate(all_states):
-                pair1, mapping1 = state_to_symbol(i, j)
-                pair2, mapping2 = state_to_symbol(k, l)
-                template = state_transitions.get((pair1, pair2))
-                if template is not None:
-                    app = deepcopy(template)
-                    # In the above mappings, "c" can get bound to different variables, but the template
-                    # only applies when they are the _same_.
-                    assert pair1[0] != "c" and pair2[0] != "c"
-                    if pair1[1] == "c" and pair2[1] == "c":
-                        if mapping1["c"] != mapping2["c"]:
-                            continue
-                    app.i = from_state
-                    app.j = to_state
-                    pulse_apps.append(app)
-
-    return pulse_params, pulse_apps
-
-
 CMatrix = List[List[float]]
 
 
@@ -1047,10 +871,6 @@ class ModelSolverInput:
     # FIXME eventually would be nice to change the smatrix to use a separate application list as well.
     amatrix_parameters: List[BoundedVariable] = field(default_factory=list)
     amatrix_applications: List[AdmixtureApplication] = field(default_factory=list)
-    # The pulse state is encoded in the same way as the admixture matrix.
-    pulse_parameters: List[BoundedVariable] = field(default_factory=list)
-    pulse_applications: List[PulseApplication] = field(default_factory=list)
-    pulse_times: List[BoundedVariable] = field(default_factory=list)
 
     # Extra data: unused by the solver, but useful to have as pass-through.
     pop_names: Optional[List[str]] = None
@@ -1104,19 +924,6 @@ class ModelSolverInput:
         amatrix_params, amatrix_apps = construct_admixture(
             model, init_from_ground_truth
         )
-        pulse_params, pulse_apps = construct_pulse(model, init_from_ground_truth)
-        pulse_times = []
-        for i, e in enumerate(model.pulse.entries):
-            if isinstance(e.time, ParamRef):
-                pulse_times.append(
-                    BoundedVariable.from_float_parameter(
-                        model.pulse.get_parameter(e.time.param),
-                        ParameterKind.PARAM_KIND_PULSE_TIME,
-                        i,
-                        not init_from_ground_truth,
-                        desc=f"Pulse time {i} ({e.source} -> {e.dest})",
-                    )
-                )
 
         # Construct the (JSON-ifiable) input object that will be sent to the solver component
         return ModelSolverInput(
@@ -1128,9 +935,6 @@ class ModelSolverInput:
             ploidy=ploidy,
             amatrix_parameters=amatrix_params,
             amatrix_applications=amatrix_apps,
-            pulse_parameters=pulse_params,
-            pulse_applications=pulse_apps,
-            pulse_times=pulse_times,
         )
 
     def randomize(self) -> "ModelSolverInput":
@@ -1143,9 +947,6 @@ class ModelSolverInput:
             sampling_hashes=self.sampling_hashes,
             amatrix_parameters=[v.randomize() for v in self.amatrix_parameters],
             amatrix_applications=self.amatrix_applications,
-            pulse_parameters=[v.randomize() for v in self.pulse_parameters],
-            pulse_applications=self.pulse_applications,
-            pulse_times=self.pulse_times,
         )
 
     @property
