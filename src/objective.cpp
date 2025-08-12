@@ -626,8 +626,11 @@ createPulseMatrix(const ParameterSchema& schema, const std::vector<double>& allP
     // TODO: make this consistent with the admixture approach. Either do this for both, or use the
     // constants in the model emitted for the pulse matrix as well.
     for (Eigen::Index i = 0; i < APMatrix.rows(); i++) {
-        if (APMatrix.row(i).sum() == 0.0) {
+        const double sum = APMatrix.row(i).sum();
+        if (sum == 0.0) {
             APMatrix(i, i) = 1;
+        } else {
+            RELEASE_ASSERT(abs(1.0 - sum) < 1.0e-6);
         }
     }
 #ifndef NDEBUG
@@ -825,7 +828,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 
         // If there is a pulse of admixture here, apply it.
         if (allTimes[i].isPulse) {
-            MatrixXd APMatrix = createPulseMatrix(schema, allPulseValues, allTimes[i].pulseIndex);
+            const MatrixXd APMatrix = createPulseMatrix(schema, allPulseValues, allTimes[i].pulseIndex);
             currentStateProbs = currentStateProbs * APMatrix;
             rowNorm(currentStateProbs); // Normalize each row to be a probability.
         }
