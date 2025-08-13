@@ -66,6 +66,9 @@ def convert_from_demes(demes_file: str) -> Dict[str, Any]:
         for e in d.epochs:
             epoch_set.add(e.start_time)
             epoch_set.add(e.end_time)
+    for m in demes_model.migrations:
+        epoch_set.add(m.start_time)
+        epoch_set.add(m.end_time)
     epoch_delimiters = list(sorted(epoch_set))
     assert epoch_delimiters[0] == 0
     assert math.isinf(epoch_delimiters[-1])
