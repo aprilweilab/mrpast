@@ -375,8 +375,6 @@ def generate_solver_input(
     sampling_hashes: Optional[List[str]] = None,
     generate_ground_truth: bool = False,
 ) -> Tuple[List[str], List[str]]:
-    # TODO: cleanup all this nasty, there should be an outer-most UserModel object.
-
     # Load the configuration and create the symbolic model from it.
     user_model = UserModel.from_file(model_file)
     solver_input = user_model.to_solver_model(

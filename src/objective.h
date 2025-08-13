@@ -242,6 +242,11 @@ private:
                            const ParameterSchema::VarList& paramVars,
                            const std::vector<size_t>& paramIdx) const;
 
+    void randomParamsViaList(double* parameters,
+                             size_t& i,
+                             const ParameterSchema::VarList& paramVars,
+                             const std::vector<size_t>& paramIdx) const;
+
     // We save the actual JSON object, because the output is identical to the
     // input except for
     // some additional fields. This way we can just copy this JSON object for the

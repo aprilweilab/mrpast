@@ -244,30 +244,27 @@ void ParameterSchema::load(const json& inputData) {
     RELEASE_ASSERT(paramCount == m_paramRescale.size());
 }
 
+void ParameterSchema::randomParamsViaList(double* parameters,
+                                          size_t& i,
+                                          const ParameterSchema::VarList& paramVars,
+                                          const std::vector<size_t>& paramIdx) const {
+    for (const size_t index : paramIdx) {
+        const auto& parameter = paramVars.at(index);
+        RELEASE_ASSERT(index < totalParams());
+        parameters[i] = toParam(randDouble(parameter.lb, parameter.ub), i);
+        i++;
+    }
+}
+
 /**
  * Populate the parameters[] vector with random values based on the lower/upper
  * bounds from the parameter schema.
  */
 void ParameterSchema::randomParamVector(double* parameters) const {
     size_t p = 0;
-    for (const size_t index : m_eParamIdx) {
-        const auto& parameter = m_eParams.at(index);
-        RELEASE_ASSERT(p < totalParams());
-        parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
-        p++;
-    }
-    for (const size_t index : m_sParamIdx) {
-        const auto& parameter = m_sParams.at(index);
-        RELEASE_ASSERT(p < totalParams());
-        parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
-        p++;
-    }
-    for (const size_t index : m_aParamIdx) {
-        const auto& parameter = m_aParams.at(index);
-        RELEASE_ASSERT(p < totalParams());
-        parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
-        p++;
-    }
+    randomParamsViaList(parameters, p, m_eParams, m_eParamIdx);
+    randomParamsViaList(parameters, p, m_sParams, m_sParamIdx);
+    randomParamsViaList(parameters, p, m_aParams, m_aParamIdx);
 }
 
 void ParameterSchema::initParamsViaList(double* parameters,
