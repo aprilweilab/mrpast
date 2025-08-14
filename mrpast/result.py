@@ -32,12 +32,20 @@ except ImportError:
     plt = None  # type: ignore
 
 
+# A fixed parameter is a constant value specified by the user, and not used by the solver.
 def _param_is_fixed(parameter: Dict[str, Any]) -> bool:
     return parameter["lb"] == parameter["ub"]
 
 
+# A synthetic parameter is either fixed or constructed, and is invisible to the user.
 def _param_is_synthetic(parameter: Dict[str, Any]) -> bool:
     return parameter["kind_index"] < 0
+
+
+# A constructed parameter is a user-visible parameter that is completely determined by the
+# value(s) of other parameters.
+def _param_is_constructed(parameter: Dict[str, Any]) -> bool:
+    return len(parameter.get("one_minus", [])) > 0
 
 
 def load_json_pandas(
@@ -69,7 +77,9 @@ def load_json_pandas(
         return value
 
     def get_interval(param, idx):
-        if interval_field is not None:
+        if interval_field is not None and not (
+            _param_is_fixed(param) or _param_is_constructed(param)
+        ):
             if isinstance(interval_field, str):
                 return param[interval_field][idx]
             return param[interval_field[idx]]
@@ -165,8 +175,6 @@ def load_json_pandas(
     for acounter, p in enumerate(data["amatrix_parameters"]):
         v = clamp(p, p["final"])
         del p["apply_to"]
-        if "one_minus" in p:
-            del p["one_minus"]
         is_fixed = _param_is_fixed(p)
         if is_fixed and skip_fixed:
             continue
@@ -184,6 +192,8 @@ def load_json_pandas(
                 "Fixed": is_fixed,
             }
         )
+        if "one_minus" in p:
+            del p["one_minus"]
         result.append(p)
 
     return pd.DataFrame.from_dict(result)

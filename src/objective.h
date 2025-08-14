@@ -107,6 +107,15 @@ struct AdmixtureApplication {
 
 inline bool isJsonParamFixed(const json& parameter) { return (parameter["lb"] == parameter["ub"]); }
 
+inline bool isJsonParamOneMinus(const json& parameter) {
+    return parameter.contains("one_minus") && !parameter["one_minus"].empty();
+}
+
+// Is a JSON parameter actually a solver parameter, or is it determined in some other way?
+inline bool isJsonParamSolverParam(const json& parameter) {
+    return !isJsonParamFixed(parameter) && !isJsonParamOneMinus(parameter);
+}
+
 /**
  * The schema describes the parameters, their bounds, and how they apply to the
  * transition matrix of the Markov model.

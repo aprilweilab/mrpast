@@ -357,6 +357,7 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
     size_t p = 0;
     RELEASE_ASSERT(output.at(EPOCH_TIMES_KEY).size() == m_eParams.size());
     for (auto& parameter : output.at(EPOCH_TIMES_KEY)) {
+        RELEASE_ASSERT(!isJsonParamOneMinus(parameter));
         if (isJsonParamFixed(parameter)) {
             parameter["final"] = m_eParams.at(i).init;
         } else {
@@ -372,6 +373,7 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
     RELEASE_ASSERT(output.at(SMATRIX_VALS_KEY).size() == m_sParams.size());
     i = 0;
     for (auto& parameter : output.at(SMATRIX_VALS_KEY)) {
+        RELEASE_ASSERT(!isJsonParamOneMinus(parameter));
         if (isJsonParamFixed(parameter)) {
             parameter["final"] = m_sParams.at(i).init;
         } else {
@@ -402,7 +404,7 @@ void ParameterSchema::fromJsonOutputViaList(double* parameters,
                                             const std::string& key,
                                             size_t& index) const {
     for (const auto& paramVal : jsonList) {
-        if (!isJsonParamFixed(paramVal)) {
+        if (isJsonParamSolverParam(paramVal)) {
             parameters[index] = toParam((double)paramVal[key], index);
             index++;
         }
