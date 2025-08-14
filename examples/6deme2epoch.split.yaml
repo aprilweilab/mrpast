@@ -1,115 +1,60 @@
 ploidy: 2
+pop_count: 7
 coalescence:
-  vectors:
-  - [1, 2, 3, 4, 5, 6, 0]
-  - [0, 0, 0, 0, 0, 0, 7]
+  entries:
+  - {"epoch": 0, "deme": 0, "rate": {"param": 1}}
+  - {"epoch": 0, "deme": 1, "rate": {"param": 2}}
+  - {"epoch": 0, "deme": 2, "rate": {"param": 3}}
+  - {"epoch": 0, "deme": 3, "rate": {"param": 4}}
+  - {"epoch": 0, "deme": 4, "rate": {"param": 5}}
+  - {"epoch": 0, "deme": 5, "rate": {"param": 6}}
+  - {"epoch": 1, "deme": 6, "rate": {"param": 7}}
   parameters:
-  - ground_truth: 6.446482873031109e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 1
-  - ground_truth: 0.0008009314586890395
-    lb: 1.0e-05
-    ub: 0.01
-    index: 2
-  - ground_truth: 0.0008957316907765961
-    lb: 1.0e-05
-    ub: 0.01
-    index: 3
-  - ground_truth: 0.0006867308124017574
-    lb: 1.0e-05
-    ub: 0.01
-    index: 4
-  - ground_truth: 0.00010430672528550718
-    lb: 1.0e-05
-    ub: 0.01
-    index: 5
-  - ground_truth: 0.0016066220136394323
-    lb: 1.0e-05
-    ub: 0.01
-    index: 6
-  - ground_truth: 0.0002133016
-    lb: 1.0e-05
-    ub: 0.01
-    index: 7
+  - {"ground_truth": 6.446482873031109e-05, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 0.0008009314586890395, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 0.0008957316907765961, "lb": 1e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 0.0006867308124017574, "lb": 1e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 0.00010430672528550718, "lb": 1e-05, "ub": 0.01, "index": 5}
+  - {"ground_truth": 0.0016066220136394323, "lb": 1e-05, "ub": 0.01, "index": 6}
+  - {"ground_truth": 0.0002133016, "lb": 1e-05, "ub": 0.01, "index": 7}
 migration:
-  matrices:
-  - [ [0, 1, 0, 2, 0, 0, 0],
-      [3, 0, 4, 0, 5, 0, 0],
-      [0, 6, 0, 0, 0, 7, 0],
-      [9, 0, 0, 0, 8, 0, 0],
-      [0, 12, 0, 10, 0, 11, 0],
-      [0, 0, 14, 0, 13, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0] ]
-  - [ [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0] ]
+  entries:
+  - {"epoch": 0, "source": 0, "dest": 1, "rate": {"param": 1}}
+  - {"epoch": 0, "source": 0, "dest": 3, "rate": {"param": 2}}
+  - {"epoch": 0, "source": 1, "dest": 0, "rate": {"param": 3}}
+  - {"epoch": 0, "source": 1, "dest": 2, "rate": {"param": 4}}
+  - {"epoch": 0, "source": 1, "dest": 4, "rate": {"param": 5}}
+  - {"epoch": 0, "source": 2, "dest": 1, "rate": {"param": 6}}
+  - {"epoch": 0, "source": 2, "dest": 5, "rate": {"param": 7}}
+  - {"epoch": 0, "source": 3, "dest": 0, "rate": {"param": 9}}
+  - {"epoch": 0, "source": 3, "dest": 4, "rate": {"param": 8}}
+  - {"epoch": 0, "source": 4, "dest": 1, "rate": {"param": 12}}
+  - {"epoch": 0, "source": 4, "dest": 3, "rate": {"param": 10}}
+  - {"epoch": 0, "source": 4, "dest": 5, "rate": {"param": 11}}
+  - {"epoch": 0, "source": 5, "dest": 2, "rate": {"param": 14}}
+  - {"epoch": 0, "source": 5, "dest": 4, "rate": {"param": 13}}
   parameters:
-  - ground_truth: 0.008358954553750823
-    lb: 1.0e-05
-    ub: 0.01
-    index: 1
-  - ground_truth: 0.003915762724032668
-    lb: 1.0e-05
-    ub: 0.01
-    index: 2
-  - ground_truth: 0.00991114687838984
-    lb: 1.0e-05
-    ub: 0.01
-    index: 3
-  - ground_truth: 0.0045634283676066765
-    lb: 1.0e-05
-    ub: 0.01
-    index: 4
-  - ground_truth: 0.006913916973521281
-    lb: 1.0e-05
-    ub: 0.01
-    index: 5
-  - ground_truth: 0.0004772000606606805
-    lb: 1.0e-05
-    ub: 0.01
-    index: 6
-  - ground_truth: 0.0007818530256436477
-    lb: 1.0e-05
-    ub: 0.01
-    index: 7
-  - ground_truth: 0.008073698909350214
-    lb: 1.0e-05
-    ub: 0.01
-    index: 8
-  - ground_truth: 0.009965563628554885
-    lb: 1.0e-05
-    ub: 0.01
-    index: 9
-  - ground_truth: 0.0048183416746066495
-    lb: 1.0e-05
-    ub: 0.01
-    index: 10
-  - ground_truth: 0.008350208435122169
-    lb: 1.0e-05
-    ub: 0.01
-    index: 11
-  - ground_truth: 0.0071613459422729545
-    lb: 1.0e-05
-    ub: 0.01
-    index: 12
-  - ground_truth: 9.206741445884357e-05
-    lb: 1.0e-05
-    ub: 0.01
-    index: 13
-  - ground_truth: 0.005250320005183591
-    lb: 1.0e-05
-    ub: 0.01
-    index: 14
-populationConversion:
-  # Epoch 1 -> Epoch 2, the population structure stays constant.
-  - [6, 6, 6, 6, 6, 6, 6]
-epochTimeSplit: 
-- ground_truth: 5.0e+03
-  lb: 1.0e+03
-  ub: 1.0e+04
-  index: 1
+  - {"ground_truth": 0.008358954553750823, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 0.003915762724032668, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 0.00991114687838984, "lb": 1e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 0.0045634283676066765, "lb": 1e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 0.006913916973521281, "lb": 1e-05, "ub": 0.01, "index": 5}
+  - {"ground_truth": 0.0004772000606606805, "lb": 1e-05, "ub": 0.01, "index": 6}
+  - {"ground_truth": 0.0007818530256436477, "lb": 1e-05, "ub": 0.01, "index": 7}
+  - {"ground_truth": 0.008073698909350214, "lb": 1e-05, "ub": 0.01, "index": 8}
+  - {"ground_truth": 0.009965563628554885, "lb": 1e-05, "ub": 0.01, "index": 9}
+  - {"ground_truth": 0.0048183416746066495, "lb": 1e-05, "ub": 0.01, "index": 10}
+  - {"ground_truth": 0.008350208435122169, "lb": 1e-05, "ub": 0.01, "index": 11}
+  - {"ground_truth": 0.0071613459422729545, "lb": 1e-05, "ub": 0.01, "index": 12}
+  - {"ground_truth": 9.206741445884357e-05, "lb": 1e-05, "ub": 0.01, "index": 13}
+  - {"ground_truth": 0.005250320005183591, "lb": 1e-05, "ub": 0.01, "index": 14}
+epochTimeSplit:
+- {"ground_truth": 5000.0, "lb": 1000.0, "ub": 10000.0, "index": 1}
+admixture:
+  entries:
+  - {"epoch": 1, "ancestral": 6, "derived": 0, "proportion": 1.0}
+  - {"epoch": 1, "ancestral": 6, "derived": 1, "proportion": 1.0}
+  - {"epoch": 1, "ancestral": 6, "derived": 2, "proportion": 1.0}
+  - {"epoch": 1, "ancestral": 6, "derived": 3, "proportion": 1.0}
+  - {"epoch": 1, "ancestral": 6, "derived": 4, "proportion": 1.0}
+  - {"epoch": 1, "ancestral": 6, "derived": 5, "proportion": 1.0}

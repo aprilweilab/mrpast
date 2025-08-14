@@ -13,19 +13,33 @@
 #
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Optional, List, Union, Dict, Any, Tuple
-from yaml import dump
+from typing import Optional, List, Union, Tuple
+from copy import deepcopy
+from yaml import load, dump
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import numpy
 import msprime
+from mrpast.model import (
+    AdmixtureEntry,
+    AdmixtureGroup,
+    DemeDemeEntry,
+    DemeDemeRates,
+    DemeRateEntry,
+    DemeRates,
+    FloatParameter,
+    ParamRef,
+    SymbolicEpochs,
+    UserModel,
+)
 
 try:
-    from yaml import CDumper as Dumper  # type: ignore
+    from yaml import CLoader as Loader, CDumper as Dumper  # type: ignore
 except ImportError:
-    from yaml import Dumper  # type: ignore
+    from yaml import Loader, Dumper  # type: ignore
 
 
 def which(exe: str, required=False) -> Optional[str]:
@@ -86,84 +100,54 @@ def count_lines(filename: str) -> int:
     return new_lines
 
 
-def dump_model_yaml(model: Dict[str, Any], out):
+def dump_model_yaml(model: UserModel, out):
     """
     Generic YAML dumpers tend to produce JSON or not very readable YAML.
 
     This is specific to how we want the models layed out for readability, but
     falls back to a YAML dumper otherwise.
     """
+    model = deepcopy(model)
+    model.unresolve_names()
 
-    def dump_matrices(matrices: List[List[List[Union[int, float]]]], indent=2):
-        prefix = " " * indent
-        print(f"{prefix}matrices:", file=out)
-        for matrix in matrices:
-            for i, row in enumerate(matrix):
-                if i == 0:
-                    row_prefix = f"{prefix}- - "
-                else:
-                    row_prefix = f"{prefix}  - "
-                print(f"{row_prefix}{json.dumps(row)}", file=out)
+    def dump_parameters(parameters: List[FloatParameter], indent=2, no_label=False):
+        if parameters:
+            prefix = " " * indent
+            if not no_label:
+                print(f"{prefix}parameters:", file=out)
+            for param in parameters:
+                print(f"{prefix}- {param.to_json()}", file=out)
 
-    def dump_vectors(vectors: List[List[Union[int, float]]], indent=2):
-        prefix = " " * indent
-        print(f"{prefix}vectors:", file=out)
-        for vector in vectors:
-            print(f"{prefix}- {json.dumps(vector)}", file=out)
-
-    def dump_parameters(parameters: List[Dict[str, float]], indent=2, no_label=False):
-        prefix = " " * indent
-        if not no_label:
-            print(f"{prefix}parameters:", file=out)
-        for param in parameters:
-            for i, key in enumerate(sorted(param.keys())):
-                if i == 0:
-                    line_prefix = f"{prefix}- "
-                else:
-                    line_prefix = f"{prefix}  "
-                print(f"{line_prefix}{key}: {json.dumps(param[key])}", file=out)
-
-    def dump_vectors_raw(vectors: List[List[Union[int, float]]], indent=2):
-        prefix = " " * indent
-        for vector in vectors:
-            line_prefix = f"{prefix}- "
-            print(f"{line_prefix}{json.dumps(vector)}", file=out)
-
-    keys = set(model.keys())
-    for key in (
-        "ploidy",
-        "pop_names",
-    ):
-        if key in keys:
-            keys.remove(key)
-            out.write(dump({key: model[key]}, Dumper=Dumper))
-    for key in ("coalescence", "growth"):
-        if key in keys:
-            keys.remove(key)
-            print(f"{key}:", file=out)
-            dump_vectors(model[key]["vectors"])
-            dump_parameters(model[key]["parameters"])
-    for key in ("migration",):
-        if key in keys:
-            keys.remove(key)
-            print(f"{key}:", file=out)
-            dump_matrices(model[key]["matrices"])
-            dump_parameters(model[key]["parameters"])
-    for key in ("epochTimeSplit",):
-        if key in keys:
-            keys.remove(key)
-            print(f"{key}:", file=out)
-            dump_parameters(model[key], indent=0, no_label=True)
-    for key in ("populationConversion",):
-        if key in keys:
-            keys.remove(key)
-            print(f"{key}:", file=out)
-            dump_vectors_raw(model[key], indent=0)
-    remaining = {}
-    for key in keys:
-        remaining[key] = model[key]
-    if remaining:
-        out.write(dump(remaining, Dumper=Dumper))
+    out.write(dump({"ploidy": model.ploidy}, Dumper=Dumper))
+    if model.pop_count > 0:
+        out.write(dump({"pop_count": model.pop_count}, Dumper=Dumper))
+    if model.pop_names:
+        out.write(dump({"pop_names": model.pop_names}, Dumper=Dumper))
+    print(f"coalescence:", file=out)
+    print(f"  entries:", file=out)
+    for e in model.coalescence.entries:
+        print(f"  - {e.to_json()}", file=out)
+    dump_parameters(model.coalescence.parameters)
+    if model.growth.entries:
+        print(f"growth:", file=out)
+        print(f"  entries:", file=out)
+        for e in model.growth.entries:
+            print(f"  - {e.to_json()}", file=out)
+        dump_parameters(model.growth.parameters)
+    if model.migration.entries:
+        print(f"migration:", file=out)
+        print(f"  entries:", file=out)
+        for e in model.migration.entries:
+            print(f"  - {e.to_json()}", file=out)
+        dump_parameters(model.migration.parameters)
+    print(f"epochTimeSplit:", file=out)
+    dump_parameters(model.epochs.epoch_times, indent=0, no_label=True)
+    if model.admixture.entries:
+        print(f"admixture:", file=out)
+        print(f"  entries:", file=out)
+        for e in model.admixture.entries:
+            print(f"  - {e.to_json()}", file=out)
+        dump_parameters(model.admixture.parameters)
 
 
 def haps2vcf(input_prefix, output_prefix, ploidy=2):
@@ -371,3 +355,69 @@ def get_best_output(filenames: List[str]) -> Tuple[Optional[str], float]:
             bestLL = negLL
             best = fn
     return (best, bestLL)
+
+
+def load_old_mrpast(yaml_file: str) -> UserModel:
+    """
+    Helper to convert old mrpast YAML files to the new format.
+    """
+    with open(yaml_file) as f:
+        config = load(f, Loader=Loader)
+        mig_params = map(
+            FloatParameter.from_dict, config["migration"]["parameters"] or []
+        )
+        mig_entries = []
+        pop_count = 0
+        for e, m in enumerate(config["migration"]["matrices"] or []):
+            m = numpy.array(m)
+            pop_count = max(pop_count, m.shape[1])
+            for i in range(m.shape[0]):
+                for j in range(m.shape[1]):
+                    if m[i, j] != 0:
+                        mig_entries.append(
+                            DemeDemeEntry(e, i, j, ParamRef(int(m[i, j])))
+                        )
+        coal_params = map(FloatParameter.from_dict, config["coalescence"]["parameters"])
+        coal_entries = []
+        for e, m in enumerate(config["coalescence"]["vectors"]):
+            m = numpy.array(m)
+            pop_count = max(pop_count, m.shape[0])
+            for i in range(m.shape[0]):
+                if m[i] != 0:
+                    coal_entries.append(DemeRateEntry(e, i, ParamRef(int(m[i]))))
+        grow_params = map(
+            FloatParameter.from_dict,
+            config.get("growth", {"parameters": []})["parameters"],
+        )
+        grow_entries = []
+        if "growth" in config:
+            for e, m in enumerate(config["growth"]["vectors"]):
+                m = numpy.array(m)
+                for i in range(m.shape[0]):
+                    if m[i] != 0:
+                        grow_entries.append(DemeRateEntry(e, i, ParamRef(int(m[i]))))
+        epochs = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
+        # Convert from the simple population conversion map into admixture entries
+        admix_entries = []
+        dead = set()
+        for i, epoch_row in enumerate(config.get("populationConversion", []) or []):
+            epoch = i + 1
+            for derived in range(len(epoch_row)):
+                ancestral = epoch_row[derived]
+                if derived != ancestral and derived not in dead:
+                    admix_entries.append(AdmixtureEntry(epoch, ancestral, derived, 1.0))
+                    dead.add(derived)
+        pop_names = config.get("pop_names", [])
+        if not pop_names:
+            pop_names = [f"pop_{i}" for i in range(pop_count)]
+        result = UserModel(
+            ploidy=config.get("ploidy", 2),
+            pop_count=pop_count,
+            pop_names=pop_names,
+            migration=DemeDemeRates(mig_entries, mig_params),
+            coalescence=DemeRates(coal_entries, coal_params),
+            epochs=epochs,
+            growth=DemeRates(grow_entries, grow_params),
+            admixture=AdmixtureGroup(admix_entries, []),
+        )
+        return result

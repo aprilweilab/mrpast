@@ -14,7 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 from tabulate import tabulate
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Iterable
+import itertools
 import json
 import math
 import mrpast.model
@@ -31,8 +32,24 @@ except ImportError:
     plt = None  # type: ignore
 
 
+# A fixed parameter is a constant value specified by the user, and not used by the solver.
+def _param_is_fixed(parameter: Dict[str, Any]) -> bool:
+    return parameter["lb"] == parameter["ub"]
+
+
+# A synthetic parameter is either fixed or constructed, and is invisible to the user.
+def _param_is_synthetic(parameter: Dict[str, Any]) -> bool:
+    return parameter["kind_index"] < 0
+
+
+# A constructed parameter is a user-visible parameter that is completely determined by the
+# value(s) of other parameters.
+def _param_is_constructed(parameter: Dict[str, Any]) -> bool:
+    return len(parameter.get("one_minus", [])) > 0
+
+
 def load_json_pandas(
-    filename: str, interval_field: Optional[str] = None
+    filename: str, interval_field: Optional[str] = None, skip_fixed: bool = True
 ) -> pd.DataFrame:
     """
     Load a solver output JSON file as a Pandas DataFrame.
@@ -42,6 +59,8 @@ def load_json_pandas(
         parameter) to use for computing the parameter confidence intervals. Typically
         this is "gim_ci", which is present on an output file if the "mrpast confidence"
         command was used to generate the JSON.
+    :param skip_fixed: Set to False to keep the fixed values that were part of the solution, otherwise
+        only the parameters will be returned.
     :return: Pandas DataDrame, where coalescent rates have been converted into effective
         population sizes (Ne).
     """
@@ -58,7 +77,9 @@ def load_json_pandas(
         return value
 
     def get_interval(param, idx):
-        if interval_field is not None:
+        if interval_field is not None and not (
+            _param_is_fixed(param) or _param_is_constructed(param)
+        ):
             if isinstance(interval_field, str):
                 return param[interval_field][idx]
             return param[interval_field[idx]]
@@ -68,6 +89,9 @@ def load_json_pandas(
     for i, p in enumerate(epochs if epochs else []):
         v = clamp(p, p["final"])
         del p["apply_to"]
+        is_fixed = _param_is_fixed(p)
+        if is_fixed and skip_fixed:
+            continue
         p.update(
             {
                 "label": f"E{i}",
@@ -76,6 +100,7 @@ def load_json_pandas(
                 "err_hi": clamp(p, get_interval(p, 1)) - v,
                 "Optimized Value": v,
                 "Parameter Type": "Epoch time",
+                "Fixed": is_fixed,
             }
         )
         result.append(p)
@@ -83,7 +108,10 @@ def load_json_pandas(
     ncounter = 0
     gcounter = 0
     for p in data["smatrix_values_ne__gen"]:
-        if p["description"].startswith("Migration rate"):
+        is_fixed = _param_is_fixed(p)
+        if is_fixed and skip_fixed:
+            continue
+        if p["kind"] == "migration":
             v = clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
@@ -96,11 +124,12 @@ def load_json_pandas(
                     "Optimized Value": v,
                     "Parameter Type": "Migration rate",
                     "Epochs": epochs,
+                    "Fixed": is_fixed,
                 }
             )
             result.append(p)
             mcounter += 1
-        elif p["description"].startswith("Growth rate"):
+        elif p["kind"] == "growth":
             v = clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
@@ -113,11 +142,12 @@ def load_json_pandas(
                     "Optimized Value": v,
                     "Parameter Type": "Growth rate",
                     "Epochs": epochs,
+                    "Fixed": is_fixed,
                 }
             )
             result.append(p)
             gcounter += 1
-        elif p["description"].startswith("Coalescence rate"):
+        elif p["kind"] == "coalescence":
 
             def coal2ne(rate):
                 return 1 / (ploidy * clamp(p, rate))
@@ -137,10 +167,35 @@ def load_json_pandas(
                     "Optimized Value": v,
                     "Parameter Type": "Effective popsize",
                     "Epochs": epochs,
+                    "Fixed": is_fixed,
                 }
             )
             result.append(p)
             ncounter += 1
+    for acounter, p in enumerate(data.get("amatrix_parameters", []) or []):
+        v = clamp(p, p["final"])
+        del p["apply_to"]
+        is_fixed = _param_is_fixed(p)
+        if is_fixed and skip_fixed:
+            continue
+        p.update(
+            {
+                "label": f"A{acounter}",
+                "Ground Truth": (
+                    clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                ),
+                "err_low": v - clamp(p, get_interval(p, 0)),
+                "err_hi": clamp(p, get_interval(p, 1)) - v,
+                "Optimized Value": v,
+                "Parameter Type": "Admixture proportion",
+                "Epochs": [],  # TODO
+                "Fixed": is_fixed,
+            }
+        )
+        if "one_minus" in p:
+            del p["one_minus"]
+        result.append(p)
+
     return pd.DataFrame.from_dict(result)
 
 
@@ -243,9 +298,11 @@ def draw_graphs(
         matplotlib.pyplot.cm.Dark2 colormap is used.
     :param x_offset: The offset from the X-axis to start drawing.
     :param coal_values: If non-None, use this list of coalescence rate values instead of the
-        ground-truth values from the model.
+        ground-truth values from the model. This only works if the model has densely packed
+        parameters, with no parameter index gaps.
     :param mig_values: If non-None, use this list of migration rate values instead of the
-        ground-truth values from the model.
+        ground-truth values from the model. This only works if the model has densely packed
+        parameters, with no parameter index gaps.
     """
     assert (
         nx is not None and plt is not None
@@ -253,52 +310,45 @@ def draw_graphs(
     if cmap is None:
         cmap = plt.cm.RdYlBu  # type: ignore
     G = nx.DiGraph()
-    model_config = mrpast.model.load_model_config(model_file)
-    ploidy = model_config["ploidy"]
-    epochs = len(model_config["coalescence"]["vectors"])
+    model = mrpast.model.UserModel.from_file(model_file)
     base_node_id = 0
     node_sizes = []
     node_colors = []
     y_offset = 0.0
     pos: Optional[Dict[Any, Any]] = None
 
+    # FIXME: neither of these functions work if there are gaps in the parameter indexing.
     def get_coal_value(coal_param_idx):
         if coal_values is not None:
-            return coal_values[coal_param_idx]
-        return model_config["coalescence"]["parameters"][coal_param_idx]["ground_truth"]
+            return coal_values[coal_param_idx - 1]
+        return model.coalescence.get_parameter(coal_param_idx).ground_truth
 
     def get_mig_value(mig_param_idx):
         if mig_values is not None:
-            return mig_values[mig_param_idx]
-        return model_config["migration"]["parameters"][mig_param_idx]["ground_truth"]
+            return mig_values[mig_param_idx - 1]
+        return model.migration.get_parameter(mig_param_idx).ground_truth
 
     avg_mig = 0.0
-    for i in range(len(model_config["migration"]["parameters"])):
-        avg_mig += get_mig_value(i)
-    avg_mig /= len(model_config["migration"]["parameters"])
+    for p in model.migration.parameters:
+        avg_mig += p.ground_truth
+    avg_mig /= len(model.migration.parameters)
 
     max_popsize = 0
-    for epoch in reversed(range(epochs)):
-        for param_idx in model_config["coalescence"]["vectors"][epoch]:
-            if param_idx > 0:
-                param = model_config["coalescence"]["parameters"][param_idx - 1]
-                pop_size = 1 / (ploidy * get_coal_value(param_idx - 1))
-                if pop_size > max_popsize:
-                    max_popsize = pop_size
+    for entry in model.coalescence.entries:
+        if isinstance(entry.rate, mrpast.model.ParamRef):
+            pop_size = 1 / (model.ploidy * get_coal_value(entry.rate.param))
+            if pop_size > max_popsize:
+                max_popsize = pop_size
 
-    for epoch in reversed(range(epochs)):
-        coal_vector = model_config["coalescence"]["vectors"][epoch]
-        mig_matrix = model_config["migration"]["matrices"][epoch]
+    for epoch in reversed(range(model.num_epochs)):
+        pop_sizes = [0 for _ in range(model.num_demes)]
+        for i in range(model.num_demes):
+            entry = model.coalescence.get_entry(epoch, i)
+            if entry is not None:
+                if isinstance(entry.rate, mrpast.model.ParamRef):
+                    pop_sizes[i] = 1 / (model.ploidy * get_coal_value(entry.rate.param))
 
-        num_demes = len(coal_vector)
-        pop_sizes = [0 for _ in range(num_demes)]
-
-        for i in range(num_demes):
-            param_idx = coal_vector[i]
-            if param_idx > 0:
-                param = model_config["coalescence"]["parameters"][param_idx - 1]
-                pop_sizes[i] = 1 / (ploidy * get_coal_value(param_idx - 1))
-        nodes = [i for i in range(num_demes) if pop_sizes[i] > 0]
+        nodes = [i for i in range(model.num_demes) if pop_sizes[i] > 0]
         node_sizes.extend(
             [max(0, (pop_sizes[i] / max_popsize) * max_node_size) for i in nodes]
         )
@@ -306,16 +356,16 @@ def draw_graphs(
 
         for i in nodes:
             G.add_node(base_node_id + i)
-            for j in range(num_demes):
-                param_idx = mig_matrix[i][j]
-                if param_idx > 0:
-                    param = model_config["migration"]["parameters"][param_idx - 1]
-                    w = math.log10(get_mig_value(param_idx - 1) / avg_mig)
-                    G.add_edge(
-                        base_node_id + i,
-                        base_node_id + j,
-                        weight=w,
-                    )
+            for j in range(model.num_demes):
+                entry = model.migration.get_entry(epoch, i, j)
+                if entry is not None:
+                    if isinstance(entry.rate, mrpast.model.ParamRef):
+                        w = math.log10(get_mig_value(entry.rate.param) / avg_mig)
+                        G.add_edge(
+                            base_node_id + i,
+                            base_node_id + j,
+                            weight=w,
+                        )
 
         if grid_cols is not None:
             if pos is None:
@@ -331,7 +381,7 @@ def draw_graphs(
             y_offset -= (len(nodes) // grid_cols) + epoch_spacing
         else:
             pos = None
-        base_node_id += num_demes
+        base_node_id += model.num_demes
 
     weights = [G[u][v]["weight"] for u, v in G.edges()]
     if popsize_color is None:
@@ -371,13 +421,12 @@ def draw_graphs(
 
     # Colorbar "legend"
     norm_weights = mpl.colors.Normalize(vmin=min(weights), vmax=max(weights))
-    if cax is None:
-        cax = ax
-    plt.colorbar(
-        plt.cm.ScalarMappable(cmap=cmap, norm=norm_weights),
-        orientation="vertical",
-        cax=cax,
-    )
+    if cax is not None:
+        plt.colorbar(
+            plt.cm.ScalarMappable(cmap=cmap, norm=norm_weights),
+            orientation="vertical",
+            cax=cax,
+        )
 
 
 def get_matching_colors(num_demes, demes=[]):
@@ -399,13 +448,21 @@ def tab_show(filename: str, sort_by: str = "Index"):
     with open(filename) as f:
         output = json.load(f)
 
-    all_params: List[Dict[str, Any]] = (output.get("epoch_times_gen", []) or []) + (
-        output.get("smatrix_values_ne__gen", []) or []
+    parameter_keys = (
+        "epoch_times_gen",
+        "smatrix_values_ne__gen",
+        "amatrix_parameters",
+    )
+
+    all_params: Iterable[Dict[str, Any]] = itertools.chain.from_iterable(
+        map(lambda k: output.get(k, []) or [], parameter_keys)
     )
     results = []
     total_rel = 0.0
     total_abs = 0.0
     for param_idx, param in enumerate(all_params):
+        if _param_is_synthetic(param) or _param_is_fixed(param):
+            continue
         gt = param["ground_truth"]
         final = param["final"]
         abserr = abs(gt - final)

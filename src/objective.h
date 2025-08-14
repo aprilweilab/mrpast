@@ -86,10 +86,35 @@ struct BoundedVariable {
     double init;
     double lb;
     double ub;
-    std::list<VariableApplication> applications;
+    std::vector<VariableApplication> applications;
     std::string description;
     double ground_truth;
+    size_t kind_index;
+    std::vector<size_t> oneMinus;
 };
+
+// An application of a two admixture variables to the admixture state matrix. This is interpreted as:
+//  A[i, j] += (coeff * v1 * v2)
+// Here v1 and v2 are indexes into the admixture vector of variables.
+struct AdmixtureApplication {
+    double coeff;
+    size_t i;
+    size_t j;
+    size_t epoch;
+    size_t v1;
+    size_t v2;
+};
+
+inline bool isJsonParamFixed(const json& parameter) { return (parameter["lb"] == parameter["ub"]); }
+
+inline bool isJsonParamOneMinus(const json& parameter) {
+    return parameter.contains("one_minus") && !parameter["one_minus"].empty();
+}
+
+// Is a JSON parameter actually a solver parameter, or is it determined in some other way?
+inline bool isJsonParamSolverParam(const json& parameter) {
+    return !isJsonParamFixed(parameter) && !isJsonParamOneMinus(parameter);
+}
 
 /**
  * The schema describes the parameters, their bounds, and how they apply to the
@@ -98,6 +123,7 @@ struct BoundedVariable {
 class ParameterSchema {
 public:
     using VarList = std::vector<BoundedVariable>;
+    using VarVector = std::vector<BoundedVariable>;
 
     explicit ParameterSchema(const bool logSpace = false)
         : m_logSpace(logSpace) {}
@@ -172,7 +198,7 @@ public:
 
     size_t numEpochs() const { return m_numEpochs; }
 
-    size_t totalParams() const { return m_eParams.size() + m_sParams.size(); }
+    size_t totalParams() const { return m_paramRescale.size(); }
 
     size_t numStates(size_t epoch) const { return m_sStates.at(epoch); }
 
@@ -190,7 +216,7 @@ public:
 
     void getBounds(size_t paramIdx, double& lowerBound, double& upperBound) const;
 
-    double getEpochStartTime(double const* parameters, size_t epoch) const;
+    std::vector<double> getEpochStartTimes(double const* parameters) const;
 
     template <typename T> void addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data);
 
@@ -200,17 +226,38 @@ public:
 
     bool samplesAreJackknifed() const { return m_inputJson["sampling_description"] == "jackknife"; }
 
-    // Parameters for epoch times
+    size_t paramStartEpochs() const { return 0; }
+    size_t paramStartSMatrix() const { return paramStartEpochs() + m_eParamIdx.size(); }
+    size_t paramStartAdmix() const { return paramStartSMatrix() + m_sParamIdx.size(); }
+
+    // Parameters and fixed values for epoch times
     VarList m_eParams;
-    // Fixed values for epoch times.
-    VarList m_eFixed;
-    // Parameters for stochastic matrix (by epoch)
+    std::vector<size_t> m_eParamIdx;
+    std::vector<size_t> m_eFixedIdx;
+    // Parameters and fixed values for stochastic matrix (by epoch)
     VarList m_sParams;
-    // Fixed values for stochastic matrix. These are just parameters that are
-    // marked "fixed".
-    VarList m_sFixed;
+    std::vector<size_t> m_sParamIdx;
+    std::vector<size_t> m_sFixedIdx;
+    // Parameters, fixed values, and no-degrees-of-freedom params for admixture matrix (by epoch)
+    VarList m_aParams;
+    std::vector<size_t> m_aParamIdx;
+    std::vector<size_t> m_aFixedIdx;
+    std::vector<size_t> m_aOneMinusIdx;
+    std::vector<AdmixtureApplication> m_admixtureApps;
 
 private:
+    void initParamsViaList(double* parameters,
+                           size_t& index,
+                           const ParameterSchema::VarList& paramVars,
+                           const std::vector<size_t>& paramIdx) const;
+
+    void randomParamsViaList(double* parameters,
+                             size_t& i,
+                             const ParameterSchema::VarList& paramVars,
+                             const std::vector<size_t>& paramIdx) const;
+
+    void fromJsonOutputViaList(double* parameters, const json& jsonList, const std::string& key, size_t& index) const;
+
     // We save the actual JSON object, because the output is identical to the
     // input except for
     // some additional fields. This way we can just copy this JSON object for the
@@ -231,15 +278,21 @@ private:
 
 template <typename T>
 void ParameterSchema::addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data) {
+    RELEASE_ASSERT(data.size() == totalParams());
     size_t p = 0;
     json& epochTimes = outputData[EPOCH_TIMES_KEY];
-    for (size_t i = 0; i < m_eParams.size(); i++) {
-        epochTimes[i][field] = data[p];
+    for (const size_t i : m_eParamIdx) {
+        epochTimes.at(i)[field] = data.at(p);
         p++;
     }
     json& sMatrixValues = outputData[SMATRIX_VALS_KEY];
-    for (size_t i = 0; i < m_sParams.size(); i++) {
-        sMatrixValues[i][field] = data[p];
+    for (const size_t i : m_sParamIdx) {
+        sMatrixValues.at(i)[field] = data.at(p);
+        p++;
+    }
+    json& aMatrixValues = outputData[AMATRIX_PARAMS_KEY];
+    for (const size_t i : m_aParamIdx) {
+        aMatrixValues.at(i)[field] = data.at(p);
         p++;
     }
 }

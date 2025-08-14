@@ -5,6 +5,9 @@ include(CheckCXXCompilerFlag)
 option(ENABLE_TESTS "Enable automated test execution" ON)
 option(ENABLE_NATIVE "Enable the compiler to use architecture-specific functionality; speeds up numerical computations but makes the resulting binaries less portable" OFF)
 
+# By default we use static libraries, which makes Python packaging easier.
+option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
 endif()

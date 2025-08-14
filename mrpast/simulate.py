@@ -24,41 +24,16 @@ import os
 from mrpast.helpers import (
     load_ratemap,
 )
-from mrpast.model import (
-    load_model_config,
-    SymbolicMatrices,
-    SymbolicEpochs,
-)
+from mrpast.model import UserModel, ParamRef
 
 
-def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
+MAX_EPOCH = 2**32
+
+
+def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[int]]:
     """
     Create the msprime Demography object for the given mrpast model filename.
     """
-    config = load_model_config(model)
-    ploidy = config["ploidy"]
-    M_symbolic = SymbolicMatrices.from_config(config["migration"])
-    q_symbolic = SymbolicMatrices.from_config(config["coalescence"], is_vector=True)
-    if "growth" in config:
-        g_symbolic = SymbolicMatrices.from_config(config["growth"], is_vector=True)
-    else:
-        g_symbolic = None
-    epochs_symbolic = SymbolicEpochs.from_config(config.get("epochTimeSplit", []))
-    assert M_symbolic.num_epochs >= 1
-    popConvert = config.get("populationConversion", [])
-    if popConvert is None:
-        popConvert = []
-    assert len(popConvert) == M_symbolic.num_epochs - 1
-
-    npops = [M_symbolic.num_demes(i) for i in range(M_symbolic.num_epochs)]
-    assert all(
-        map(lambda n: n == npops[0], npops)
-    ), "All matrices must have the same population size"
-    for row in popConvert:
-        assert len(row) == npops[0]
-
-    pop_names = config.get("pop_names", [f"pop_{i}" for i in range(npops[0])])
-    assert len(pop_names) == npops[0], f"pop_names has wrong length, must be {npops[0]}"
 
     # ASSUMPTION: Epoch_0 (the most recent) lists all the populations. Any population can be "unused"
     # in any epoch. If Epoch_i "introduces" a new population (backwards in time) then that population
@@ -78,137 +53,140 @@ def build_demography(model: str) -> Tuple[msprime.Demography, List[int]]:
     #   population has become active by that Epoch due to a migration event.
 
     def Ne_from_coal_rate(coal_rate: float) -> float:
-        return 1 / (ploidy * coal_rate)
+        return 1 / (user_model.ploidy * coal_rate)
 
     # Migration is thought of backwards here, and in the MrPast model. So if we
     # have non-zero migration from A->B, it means that in forward-time people migrated
     # from B->A
-    num_epochs = len(npops)
-    num_pops = npops[0]
+    num_epochs = user_model.num_epochs
+    num_pops = user_model.pop_count
     demography = msprime.Demography()
     active_pops = []
     # Pass 1: Add all of the populations and determine their initial size.
     for i in range(num_pops):
         initially_active = False
         size = None
+        rate_value = None
         for epoch in range(num_epochs):
             # ne = 1 / (lambda * ploidy)
-            rate_param = q_symbolic.get_parameter(q_symbolic.matrices[epoch][i])
-            if rate_param is not None:
+            rate_value = user_model.coalescence.get_sim_value(epoch, i)
+            if rate_value is not None:
                 if epoch == 0:
                     initially_active = True
                     active_pops.append(i)
-                size = Ne_from_coal_rate(rate_param.ground_truth)
+                size = Ne_from_coal_rate(rate_value)
                 break
         assert (
-            rate_param is not None
+            rate_value is not None
         ), "Every population must have at least one epoch with a coalescent rate"
-        growth_rate = None
-        if g_symbolic is not None:
-            grate_param = g_symbolic.get_parameter(g_symbolic.matrices[epoch][i])
-            if grate_param is not None:
-                growth_rate = grate_param.ground_truth
+        growth_rate = user_model.growth.get_sim_value(epoch, i)
         demography.add_population(
             initial_size=size,
             initially_active=initially_active,
-            growth_rate=growth_rate,
-            name=pop_names[i],
+            growth_rate=growth_rate,  # May be None
+            name=user_model.pop_names[i],
         )
-    # Pass 2: Find all population splits by identifying changes in populationConversion
+
+    # Pass 2: Find all population splits and admixture events.
+    def proportionAsFloat(proportion: Union[float, ParamRef]) -> float:
+        if isinstance(proportion, ParamRef):
+            return user_model.admixture.get_parameter(proportion.param).ground_truth
+        return float(proportion)
+
     dead_pops = {}
-    for dest_epoch in range(1, num_epochs):
-        source_epoch = dest_epoch - 1
-        derived = defaultdict(list)
-        for src_pop in range(num_pops):
-            dest_pop = popConvert[source_epoch][src_pop]
-            if dest_pop != src_pop and src_pop not in dead_pops:
-                derived[dest_pop].append(src_pop)
-                dead_pops[src_pop] = dest_epoch
-        epoch_time = epochs_symbolic.epoch_times[source_epoch].ground_truth
-        for dest_pop, derived_list in derived.items():
-            demography.add_population_split(
-                time=epoch_time, derived=list(derived_list), ancestral=dest_pop
-            )
-    del rate_param
+    for epoch in range(1, user_model.num_epochs):
+        # Collect all entries by their derived population.
+        by_derived = defaultdict(list)
+        for i, entry in enumerate(user_model.admixture.entries):
+            if entry.epoch == epoch:
+                by_derived[entry.derived].append(
+                    (entry.ancestral, proportionAsFloat(entry.proportion))
+                )
+        epoch_start = user_model.epochs.epoch_times[epoch - 1].ground_truth
+        for derived_deme in range(user_model.num_demes):
+            # Population split if we have a 1-to-1 mapping.
+            if len(by_derived[derived_deme]) == 1:
+                ancestral, proportion = by_derived[derived_deme][0]
+                assert abs(1.0 - proportion) < 1e6
+                demography.add_population_split(
+                    time=epoch_start, derived=[derived_deme], ancestral=ancestral
+                )
+                dead_pops[derived_deme] = epoch
+            # Otherwise it is admixture.
+            elif len(by_derived[derived_deme]) > 1:
+                demography.add_admixture(
+                    epoch_start,
+                    derived=derived_deme,
+                    ancestral=list(map(lambda t: t[0], by_derived[derived_deme])),
+                    proportions=list(map(lambda t: t[1], by_derived[derived_deme])),
+                )
+                dead_pops[derived_deme] = epoch
 
     # Pass 3: setup the initial migration rates and rate change events.
     for epoch in range(num_epochs):
         epoch_time = None
         if epoch > 0:
-            epoch_time = epochs_symbolic.epoch_times[epoch - 1].ground_truth
+            epoch_time = user_model.epochs.epoch_times[epoch - 1].ground_truth
         for i in range(num_pops):
             # We skip any dead populations. The simulator will yell at us for trying to make changes to them.
-            if dead_pops.get(i, 2**32) <= epoch:
+            if dead_pops.get(i, MAX_EPOCH) <= epoch:
                 continue
 
             # Handle coalescence rate (effective population size) changes
             if epoch > 0:
-                crate_idx = q_symbolic.matrices[epoch][i]
-                prev_crate_idx = q_symbolic.matrices[epoch - 1][i]
-                prev_grate_param_idx = None
-                grate_param_idx = None
-                if g_symbolic is not None:
-                    grate_param_idx = g_symbolic.matrices[epoch][i]
-                    prev_grate_param_idx = g_symbolic.matrices[epoch - 1][i]
+                coal_rate = user_model.coalescence.get_sim_value(epoch, i)
+                prev_coal_rate = user_model.coalescence.get_sim_value(epoch - 1, i)
+                grow_rate = user_model.growth.get_sim_value(epoch, i)
+                prev_grow_rate = user_model.growth.get_sim_value(epoch - 1, i)
                 if (
-                    prev_crate_idx != crate_idx
-                    and prev_crate_idx != 0
-                    and crate_idx != 0
-                ) or (grate_param_idx != prev_grate_param_idx):
-                    crate_param = q_symbolic.get_parameter(crate_idx)
-                    if crate_param is not None:
-                        size = Ne_from_coal_rate(crate_param.ground_truth)
+                    prev_coal_rate != coal_rate
+                    and prev_coal_rate is not None
+                    and coal_rate is not None
+                ) or (grow_rate != prev_grow_rate):
+                    if coal_rate is not None:
+                        size = Ne_from_coal_rate(coal_rate)
                     else:
                         size = 0
-
-                    growth_rate = 0
-                    if g_symbolic is not None:
-                        grate_param = g_symbolic.get_parameter(grate_param_idx)
-                        if grate_param is not None:
-                            growth_rate = grate_param.ground_truth
-                            print(f"Changing growth rate to {growth_rate}")
 
                     demography.add_population_parameters_change(
                         epoch_time,
                         initial_size=size,
                         population=i,
-                        growth_rate=growth_rate,
+                        growth_rate=grow_rate if grow_rate is not None else 0,
                     )
 
             # Handle migration with all other populations.
-            for j in range(num_pops):
-                mrate_idx = M_symbolic.matrices[epoch][i, j]
-                mrate_param = M_symbolic.get_parameter(mrate_idx)
-                prev_mrate_idx = None
+            for j in range(user_model.pop_count):
+                mig_rate = user_model.migration.get_sim_value(epoch, i, j)
                 if epoch > 0:
-                    prev_mrate_idx = M_symbolic.matrices[epoch - 1][i, j]
+                    prev_mig_rate = user_model.migration.get_sim_value(epoch - 1, i, j)
 
                 # "The entry of [migration rate matrix] is the expected number of migrants moving from population i
                 #    to population j per generation, divided by the size of population j."
                 if epoch == 0:
-                    if mrate_param is not None:
-                        demography.set_migration_rate(i, j, mrate_param.ground_truth)
+                    if mig_rate is not None:
+                        demography.set_migration_rate(i, j, mig_rate)
                 else:
-                    assert prev_mrate_idx is not None
                     # We have a change in rate.
-                    if mrate_idx != prev_mrate_idx:
-                        if mrate_param is None:
+                    if mig_rate != prev_mig_rate:
+                        if mig_rate is None:
                             demography.add_migration_rate_change(
                                 time=epoch_time, rate=0, source=i, dest=j
                             )
                         else:
                             demography.add_migration_rate_change(
                                 time=epoch_time,
-                                rate=mrate_param.ground_truth,
+                                rate=mig_rate,
                                 source=i,
                                 dest=j,
                             )
+
     demography.sort_events()
     return demography, active_pops
 
 
 def _run_simulation(
-    model: str,
+    model_file: str,
     arg_prefix: str,
     seq_len: int,
     num_replicates: int,
@@ -219,25 +197,17 @@ def _run_simulation(
     seed: int = 42,
 ) -> int:
 
+    model = UserModel.from_file(model_file)
     demography, active_pops = build_demography(model)
-
-    config = load_model_config(model)
-    ploidy = config["ploidy"]
-    M_symbolic = SymbolicMatrices.from_config(config["migration"])
-    npops = [M_symbolic.num_demes(i) for i in range(M_symbolic.num_epochs)]
-    assert all(
-        map(lambda n: n == npops[0], npops)
-    ), "All matrices must have the same population size"
 
     table = [
         ["Sequence Length", seq_len],
         ["Recombination rate", recomb_rate],
         ["Samples/population", samples_per_pop],
-        ["Ploidy", ploidy],
-        ["Epochs", M_symbolic.num_epochs],
+        ["Ploidy", model.ploidy],
+        ["Epochs", model.num_epochs],
+        ["Populations", model.pop_count],
     ]
-    for i in range(len(npops)):
-        table.append([f"Population Count (E{i})", npops[i]])
     print("Preparing simulation with parameters:")
     print(tabulate(table, headers=["Parameter", "Value"]))
     print()

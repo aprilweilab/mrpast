@@ -1,0 +1,97 @@
+# Converted from the Demes model for stdpopsim OutOfAfricaArchaicAdmixture_5R19
+ploidy: 2
+pop_count: 5
+pop_names:
+- YRI
+- Neanderthal
+- ArchaicAFR
+- CEU
+- CHB
+coalescence:
+  entries:
+  - {"epoch": 5, "deme": "YRI", "rate": {"param": 1}}
+  - {"epoch": 6, "deme": "YRI", "rate": {"param": 1}}
+  - {"epoch": 7, "deme": "YRI", "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 2, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 3, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 4, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 0, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 1, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 2, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 3, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 4, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 5, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 6, "deme": "Neanderthal", "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "ArchaicAFR", "rate": {"param": 6}}
+  - {"epoch": 1, "deme": "ArchaicAFR", "rate": {"param": 6}}
+  - {"epoch": 2, "deme": "ArchaicAFR", "rate": {"param": 6}}
+  - {"epoch": 3, "deme": "ArchaicAFR", "rate": {"param": 6}}
+  - {"epoch": 4, "deme": "ArchaicAFR", "rate": {"param": 6}}
+  - {"epoch": 5, "deme": "ArchaicAFR", "rate": {"param": 6}}
+  - {"epoch": 2, "deme": "CEU", "rate": {"param": 3}}
+  - {"epoch": 0, "deme": "CEU", "rate": {"param": 4}}
+  - {"epoch": 1, "deme": "CEU", "rate": {"param": 4}}
+  - {"epoch": 0, "deme": "CHB", "rate": {"param": 5}}
+  - {"epoch": 1, "deme": "CHB", "rate": {"param": 5}}
+  parameters:
+  - {"ground_truth": 0.0001388888888888889, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 3.597122302158273e-05, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 0.0005681818181818182, "lb": 1e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 4.6061379202760194e-05, "lb": 1e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 7.5947709685129795e-06, "lb": 3.7973854842564898e-06, "ub": 0.01, "index": 5}
+  - {"ground_truth": 0.0001388888888888889, "lb": 1e-05, "ub": 0.01, "index": 6}
+growth:
+  entries:
+  - {"epoch": 0, "deme": "CEU", "rate": {"param": 1}}
+  - {"epoch": 1, "deme": "CEU", "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "CHB", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "CHB", "rate": {"param": 2}}
+  parameters:
+  - {"ground_truth": 0.00125, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 0.00372, "lb": 1e-05, "ub": 0.01, "index": 2}
+migration:
+  entries:
+  - {"epoch": 1, "source": "ArchaicAFR", "dest": "YRI", "rate": {"param": 1}}
+  - {"epoch": 2, "source": "ArchaicAFR", "dest": "YRI", "rate": {"param": 1}}
+  - {"epoch": 3, "source": "ArchaicAFR", "dest": "YRI", "rate": {"param": 1}}
+  - {"epoch": 1, "source": "YRI", "dest": "ArchaicAFR", "rate": {"param": 1}}
+  - {"epoch": 2, "source": "YRI", "dest": "ArchaicAFR", "rate": {"param": 1}}
+  - {"epoch": 3, "source": "YRI", "dest": "ArchaicAFR", "rate": {"param": 1}}
+  - {"epoch": 2, "source": "CEU", "dest": "YRI", "rate": {"param": 2}}
+  - {"epoch": 2, "source": "YRI", "dest": "CEU", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "Neanderthal", "dest": "CEU", "rate": {"param": 3}}
+  - {"epoch": 2, "source": "Neanderthal", "dest": "CEU", "rate": {"param": 3}}
+  - {"epoch": 1, "source": "CEU", "dest": "Neanderthal", "rate": {"param": 3}}
+  - {"epoch": 2, "source": "CEU", "dest": "Neanderthal", "rate": {"param": 3}}
+  - {"epoch": 1, "source": "CHB", "dest": "Neanderthal", "rate": {"param": 3}}
+  - {"epoch": 1, "source": "Neanderthal", "dest": "CHB", "rate": {"param": 3}}
+  - {"epoch": 0, "source": "CEU", "dest": "YRI", "rate": {"param": 4}}
+  - {"epoch": 1, "source": "CEU", "dest": "YRI", "rate": {"param": 4}}
+  - {"epoch": 0, "source": "YRI", "dest": "CEU", "rate": {"param": 4}}
+  - {"epoch": 1, "source": "YRI", "dest": "CEU", "rate": {"param": 4}}
+  - {"epoch": 0, "source": "CHB", "dest": "CEU", "rate": {"param": 5}}
+  - {"epoch": 1, "source": "CHB", "dest": "CEU", "rate": {"param": 5}}
+  - {"epoch": 0, "source": "CEU", "dest": "CHB", "rate": {"param": 5}}
+  - {"epoch": 1, "source": "CEU", "dest": "CHB", "rate": {"param": 5}}
+  parameters:
+  - {"ground_truth": 1.98e-05, "lb": 1e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 0.000522, "lb": 1e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 8.25e-06, "lb": 4.125e-06, "ub": 0.01, "index": 3}
+  - {"ground_truth": 2.48e-05, "lb": 1e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 0.000113, "lb": 1e-05, "ub": 0.01, "index": 5}
+epochTimeSplit:
+- {"ground_truth": 644.8275862068965, "lb": 100.0, "ub": 943.0, "index": 1}
+- {"ground_truth": 1241.3793103448277, "lb": 943.0, "ub": 1667.0, "index": 2}
+- {"ground_truth": 2093.103448275862, "lb": 1667.0, "ub": 3201.0, "index": 3}
+- {"ground_truth": 4310.3448275862065, "lb": 3201.0, "ub": 7327.0, "index": 4}
+- {"ground_truth": 10344.827586206897, "lb": 7327.0, "ub": 13775.0, "index": 5}
+- {"ground_truth": 17206.896551724138, "lb": 13775.0, "ub": 18241.0, "index": 6}
+- {"ground_truth": 19275.862068965518, "lb": 18241.0, "ub": 28396.0, "index": 7}
+admixture:
+  entries:
+  - {"epoch": 7, "ancestral": "YRI", "derived": "Neanderthal", "proportion": 1.0}
+  - {"epoch": 6, "ancestral": "YRI", "derived": "ArchaicAFR", "proportion": 1.0}
+  - {"epoch": 3, "ancestral": "YRI", "derived": "CEU", "proportion": 1.0}
+  - {"epoch": 2, "ancestral": "CEU", "derived": "CHB", "proportion": 1.0}

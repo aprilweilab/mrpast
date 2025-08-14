@@ -18,6 +18,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -38,15 +39,6 @@ using Eigen::VectorXd;
 // Turn this on and recompile, to track down numerical problems.
 #define TRACE_MATRICES 0
 
-// Flags that affect how we approximate the application of the growth rate.
-// Use the average coalescence rate from start of epoch to time T_k. The smaller T_k is, the
-// more accurate this will be.
-#define USE_AVG_COAL_RATE 1
-// Use the the actual coalescence rate at time T_k, which will be the largest rate. This over-
-// approximates the rate and under-approximates the Ne over T_k. When T_k is large, the coal
-// rate is large (Ne is small), and this will _really_ over-approximate.
-#define USE_OVER_APPROX_COAL_RATE 0
-
 // When computing probabilities in multi-epoch models, this uses the additive probability rule
 // P(A or B) = P(A) + P(B) - P(A and B), instead of negating all of the probabilities to only
 // use P(not(A) and not(B)). The former results in fewer subtractions, which anecdotally appears
@@ -55,7 +47,7 @@ using Eigen::VectorXd;
 
 #define DUMP_MATRIX(m, desc)                                                                                           \
     do {                                                                                                               \
-        std::cerr << "% " << desc << ":" << std::endl;                                                                 \
+        std::cerr << "% " << desc << ": " << std::endl;                                                                \
         std::cerr << "[";                                                                                              \
         for (Eigen::Index i = 0; i < (m).rows(); i++) {                                                                \
             if (i > 0) {                                                                                               \
@@ -128,8 +120,6 @@ std::vector<MatrixXd> loadCMatrices(json& inputListOfMatrices) {
     return std::move(result);
 }
 
-MatrixXd loadPopConversion(json& inputJson) { return loadJsonMatrix(inputJson, POP_CONVERT_KEY); }
-
 /**
  * Both input and output values are in generations.
  */
@@ -153,29 +143,65 @@ void verifyQMatrix(const MatrixXd& sMatrix) {
 }
 #endif
 
+double getGroundTruth(const json& parameter) {
+    double ground_truth = std::numeric_limits<float>::quiet_NaN();
+    if (parameter.contains("ground_truth") && !parameter["ground_truth"].is_null()) {
+        ground_truth = parameter["ground_truth"];
+    }
+    return ground_truth;
+}
+
+void loadParamList(const json& parameterList,
+                   ParameterSchema::VarList& allParams,
+                   std::vector<size_t>& freeParamIdx,
+                   std::vector<size_t>& fixedParamIdx,
+                   std::vector<size_t>& oneMinusIdx,
+                   std::vector<double>& rescaling,
+                   const bool isEpoch = false) {
+    for (const auto& parameter : parameterList) {
+        std::vector<size_t> oneMinus;
+        if (parameter.contains("one_minus")) {
+            for (const auto& om : parameter["one_minus"]) {
+                oneMinus.push_back((size_t)om);
+            }
+        }
+        const double ground_truth = getGroundTruth(parameter);
+        if (isJsonParamFixed(parameter)) {
+            fixedParamIdx.push_back(allParams.size());
+        } else if (!oneMinus.empty()) {
+            oneMinusIdx.push_back(allParams.size());
+        } else {
+            freeParamIdx.push_back(allParams.size());
+            if (isEpoch) {
+                rescaling.emplace_back(EPOCH_TIME_RESCALE);
+            } else {
+                rescaling.emplace_back(1.0);
+            }
+        }
+        BoundedVariable bv = {parameter["init"],
+                              parameter["lb"],
+                              parameter["ub"],
+                              {},
+                              parameter["description"],
+                              ground_truth,
+                              parameter["kind_index"],
+                              std::move(oneMinus)};
+        allParams.push_back(std::move(bv));
+    }
+}
+
 void ParameterSchema::load(const json& inputData) {
     m_paramRescale.resize(0);
     m_inputJson = inputData;
-    for (const auto& parameter : inputData.at(EPOCH_TIMES_KEY)) {
-        double ground_truth = std::numeric_limits<float>::quiet_NaN();
-        if (parameter.contains("ground_truth")) {
-            ground_truth = parameter["ground_truth"];
-        }
-        BoundedVariable bv = {
-            parameter["init"], parameter["lb"], parameter["ub"], {}, parameter["description"], ground_truth};
-        const bool isFixed = parameter.contains("fixed") && (bool)parameter["fixed"];
-        if (isFixed) {
-            m_eFixed.push_back(std::move(bv));
-        } else {
-            m_eParams.push_back(std::move(bv));
-            m_paramRescale.emplace_back(EPOCH_TIME_RESCALE);
-        }
-    }
-    RELEASE_ASSERT(m_eParams.empty() || m_eFixed.empty()); // Only all fixed or all params
-    m_numEpochs = m_eParams.size() + m_eFixed.size() + 1;
+    std::vector<size_t> ignored;
+    // EPOCH PARAMETERS
+    loadParamList(
+        inputData.at(EPOCH_TIMES_KEY), m_eParams, m_eParamIdx, m_eFixedIdx, ignored, m_paramRescale, /*isEpoch=*/true);
+    m_numEpochs = m_eParams.size() + 1;
     m_sStates = std::vector<size_t>(m_numEpochs);
+    // STOCHASTIC MATRIX (Q-Matrix) PARAMETERS
     for (const auto& parameter : inputData.at(SMATRIX_VALS_KEY)) {
-        std::list<VariableApplication> applications;
+        std::vector<VariableApplication> applications;
         const auto& applyTo = parameter["apply_to"];
         assert(!applyTo.empty());
         for (const auto& app : applyTo) {
@@ -192,25 +218,48 @@ void ParameterSchema::load(const json& inputData) {
             }
             applications.push_back({app["coeff"], i, j, epoch, adjust});
         }
-        double ground_truth = std::numeric_limits<float>::quiet_NaN();
-        if (parameter.contains("ground_truth")) {
-            ground_truth = parameter["ground_truth"];
-        }
+        const double ground_truth = getGroundTruth(parameter);
         BoundedVariable bv = {parameter["init"],
                               parameter["lb"],
                               parameter["ub"],
                               std::move(applications),
                               parameter["description"],
                               ground_truth};
-        const bool isFixed = parameter.contains("fixed") && (bool)parameter["fixed"];
-        if (isFixed) {
-            m_sFixed.push_back(std::move(bv));
+        if (isJsonParamFixed(parameter)) {
+            m_sFixedIdx.push_back(m_sParams.size());
         } else {
-            m_sParams.push_back(std::move(bv));
+            m_sParamIdx.push_back(m_sParams.size());
             m_paramRescale.emplace_back(1.0);
         }
+        m_sParams.push_back(std::move(bv));
     }
-    RELEASE_ASSERT(m_sParams.size() + m_eParams.size() == m_paramRescale.size());
+    // ADMIXTURE STATE MATRIX PARAMETERS
+    loadParamList(
+        inputData.at(AMATRIX_PARAMS_KEY), m_aParams, m_aParamIdx, m_aFixedIdx, m_aOneMinusIdx, m_paramRescale);
+    for (const auto& application : inputData.at(AMATRIX_APPS_KEY)) {
+        m_admixtureApps.push_back({
+            application["coeff"],
+            application["i"],
+            application["j"],
+            application["epoch"],
+            application["vars"].at(0),
+            application["vars"].at(1),
+        });
+    }
+    const size_t paramCount = (m_sParamIdx.size() + m_eParamIdx.size() + m_aParamIdx.size());
+    RELEASE_ASSERT(paramCount == m_paramRescale.size());
+}
+
+void ParameterSchema::randomParamsViaList(double* parameters,
+                                          size_t& i,
+                                          const ParameterSchema::VarList& paramVars,
+                                          const std::vector<size_t>& paramIdx) const {
+    for (const size_t index : paramIdx) {
+        const auto& parameter = paramVars.at(index);
+        RELEASE_ASSERT(index < totalParams());
+        parameters[i] = toParam(randDouble(parameter.lb, parameter.ub), i);
+        i++;
+    }
 }
 
 /**
@@ -219,13 +268,20 @@ void ParameterSchema::load(const json& inputData) {
  */
 void ParameterSchema::randomParamVector(double* parameters) const {
     size_t p = 0;
-    for (const auto& parameter : m_eParams) {
-        parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
-        p++;
-    }
-    for (const auto& parameter : m_sParams) {
-        parameters[p] = toParam(randDouble(parameter.lb, parameter.ub), p);
-        p++;
+    randomParamsViaList(parameters, p, m_eParams, m_eParamIdx);
+    randomParamsViaList(parameters, p, m_sParams, m_sParamIdx);
+    randomParamsViaList(parameters, p, m_aParams, m_aParamIdx);
+}
+
+void ParameterSchema::initParamsViaList(double* parameters,
+                                        size_t& i,
+                                        const ParameterSchema::VarList& paramVars,
+                                        const std::vector<size_t>& paramIdx) const {
+    for (const size_t index : paramIdx) {
+        const auto& parameter = paramVars.at(index);
+        RELEASE_ASSERT(index < totalParams());
+        parameters[i] = toParam(parameter.init, i);
+        i++;
     }
 }
 
@@ -235,82 +291,134 @@ void ParameterSchema::randomParamVector(double* parameters) const {
  */
 void ParameterSchema::initParamVector(double* parameters) const {
     size_t p = 0;
-    for (const auto& parameter : m_eParams) {
-        parameters[p] = toParam(parameter.init, p);
-        p++;
-    }
-    for (const auto& parameter : m_sParams) {
-        parameters[p] = toParam(parameter.init, p);
-        p++;
-    }
+    initParamsViaList(parameters, p, m_eParams, m_eParamIdx);
+    initParamsViaList(parameters, p, m_sParams, m_sParamIdx);
+    initParamsViaList(parameters, p, m_aParams, m_aParamIdx);
 }
 
 void ParameterSchema::getBounds(size_t paramIdx, double& lowerBound, double& upperBound) const {
-    if (paramIdx < m_eParams.size()) {
-        lowerBound = toParam(m_eParams.at(paramIdx).lb, paramIdx);
-        upperBound = toParam(m_eParams.at(paramIdx).ub, paramIdx);
+    if (paramIdx >= paramStartAdmix()) {
+        const size_t index = m_aParamIdx.at(paramIdx - paramStartAdmix());
+        lowerBound = toParam(m_aParams.at(index).lb, paramIdx);
+        upperBound = toParam(m_aParams.at(index).ub, paramIdx);
+    } else if (paramIdx >= paramStartSMatrix()) {
+        const size_t index = m_sParamIdx.at(paramIdx - paramStartSMatrix());
+        lowerBound = toParam(m_sParams.at(index).lb, paramIdx);
+        upperBound = toParam(m_sParams.at(index).ub, paramIdx);
     } else {
-        const size_t sIdx = paramIdx - m_eParams.size();
-        lowerBound = toParam(m_sParams.at(sIdx).lb, paramIdx);
-        upperBound = toParam(m_sParams.at(sIdx).ub, paramIdx);
+        const size_t index = m_eParamIdx.at(paramIdx);
+        lowerBound = toParam(m_eParams.at(index).lb, paramIdx);
+        upperBound = toParam(m_eParams.at(index).ub, paramIdx);
     }
 }
 
-double ParameterSchema::getEpochStartTime(double const* parameters, size_t epoch) const {
-    assert(epoch < m_numEpochs);
-    double epochTime = 0.0;
-    if (epoch > 0) {
-        const size_t paramIdx = epoch - 1;
-        if (!m_eParams.empty()) {
-            epochTime = fromParam(parameters[paramIdx], paramIdx);
-        } else {
-            epochTime = m_eFixed.at(paramIdx).init;
-        }
+std::vector<double> ParameterSchema::getEpochStartTimes(double const* parameters) const {
+    std::vector<double> result(m_eParams.size());
+    for (size_t i = 0; i < m_eParamIdx.size(); i++) {
+        const size_t epochIndex = m_eParamIdx[i];
+        result.at(epochIndex) = fromParam(parameters[i], i);
     }
-    return epochTime;
+    for (size_t epochIndex : m_eFixedIdx) {
+        result.at(epochIndex) = m_eParams[epochIndex].init;
+    }
+    return std::move(result);
+}
+
+std::vector<double> getAdmixtureValues(const ParameterSchema& schema, double const* parameters) {
+    // Copy all of the parameter and fixed values into the admixture value vector.
+    const size_t firstParamIdx = schema.m_eParamIdx.size() + schema.m_sParamIdx.size();
+    const size_t numAdmixtureValues = schema.m_aParams.size();
+    std::vector<double> admixtureValues(numAdmixtureValues);
+    // Copy parameters from the solver input
+    size_t paramIdx = firstParamIdx;
+    for (const size_t index : schema.m_aParamIdx) {
+        RELEASE_ASSERT(paramIdx < schema.totalParams());
+        admixtureValues.at(index) = schema.fromParam(parameters[paramIdx], paramIdx);
+        paramIdx++;
+    }
+    // Populate the fixed values  (TODO: could prepopulate this during parsing)
+    for (const size_t index : schema.m_aFixedIdx) {
+        admixtureValues.at(index) = schema.m_aParams.at(index).init;
+    }
+    // Populate the "one-minus" values (parameters determined by other parameters)
+    for (const size_t index : schema.m_aOneMinusIdx) {
+        double sum = 0.0;
+        for (const size_t otherIndex : schema.m_aParams.at(index).oneMinus) {
+            sum += admixtureValues.at(otherIndex);
+        }
+        admixtureValues.at(index) = 1.0 - sum;
+    }
+    return std::move(admixtureValues);
 }
 
 json ParameterSchema::toJsonOutput(const double* parameters, const double negLL) const {
     json output = m_inputJson; // Make a copy of the input.
-    size_t e = 0;
+    size_t i = 0;
     size_t p = 0;
-    RELEASE_ASSERT(output.at(EPOCH_TIMES_KEY).size() == m_eParams.size() + m_eFixed.size());
+    RELEASE_ASSERT(output.at(EPOCH_TIMES_KEY).size() == m_eParams.size());
     for (auto& parameter : output.at(EPOCH_TIMES_KEY)) {
-        if (!m_eParams.empty()) {
+        RELEASE_ASSERT(!isJsonParamOneMinus(parameter));
+        if (isJsonParamFixed(parameter)) {
+            parameter["final"] = m_eParams.at(i).init;
+        } else {
+            RELEASE_ASSERT(p < totalParams());
             parameter["final"] = fromParam(parameters[p], p);
             p++;
-        } else {
-            parameter["final"] = m_eFixed.at(e).init;
-            e++;
         }
+        i++;
     }
+    RELEASE_ASSERT(i == m_eParams.size());
+    RELEASE_ASSERT(p == m_eParamIdx.size());
+
     RELEASE_ASSERT(output.at(SMATRIX_VALS_KEY).size() == m_sParams.size());
+    i = 0;
     for (auto& parameter : output.at(SMATRIX_VALS_KEY)) {
-        parameter["final"] = fromParam(parameters[p], p);
-        p++;
+        RELEASE_ASSERT(!isJsonParamOneMinus(parameter));
+        if (isJsonParamFixed(parameter)) {
+            parameter["final"] = m_sParams.at(i).init;
+        } else {
+            RELEASE_ASSERT(p < totalParams());
+            parameter["final"] = fromParam(parameters[p], p);
+            p++;
+        }
+        i++;
     }
+    RELEASE_ASSERT(i == m_sParams.size());
+    RELEASE_ASSERT((p - m_eParamIdx.size()) == m_sParamIdx.size());
+
+    RELEASE_ASSERT(output.at(AMATRIX_PARAMS_KEY).size() == m_aParams.size());
+    i = 0;
+    std::vector<double> admixtureValues = getAdmixtureValues(*this, parameters);
+    for (auto& parameter : output.at(AMATRIX_PARAMS_KEY)) {
+        parameter["final"] = admixtureValues.at(i);
+        i++;
+    }
+    RELEASE_ASSERT(i == m_aParams.size());
+
     output["negLL"] = negLL;
     return std::move(output);
 }
 
+void ParameterSchema::fromJsonOutputViaList(double* parameters,
+                                            const json& jsonList,
+                                            const std::string& key,
+                                            size_t& index) const {
+    for (const auto& paramVal : jsonList) {
+        if (isJsonParamSolverParam(paramVal)) {
+            parameters[index] = toParam((double)paramVal[key], index);
+            index++;
+        }
+    }
+}
+
 void ParameterSchema::fromJsonOutput(const json& jsonOutput, double* parameters, std::string key) const {
     size_t p = 0;
-    for (const auto& paramVal : jsonOutput[EPOCH_TIMES_KEY]) {
-        const bool isFixed = paramVal.contains("fixed") && (bool)paramVal["fixed"];
-        if (!isFixed) {
-            parameters[p] = toParam((double)paramVal[key], p);
-            p++;
-        }
-    }
+    fromJsonOutputViaList(parameters, jsonOutput[EPOCH_TIMES_KEY], key, p);
     RELEASE_ASSERT(m_eParams.size() == p);
-    for (const auto& paramVal : jsonOutput[SMATRIX_VALS_KEY]) {
-        const bool isFixed = paramVal.contains("fixed") && (bool)paramVal["fixed"];
-        if (!isFixed) {
-            parameters[p] = toParam((double)paramVal[key], p);
-            p++;
-        }
-    }
-    RELEASE_ASSERT(m_sParams.size() + m_eParams.size() == p);
+    fromJsonOutputViaList(parameters, jsonOutput[SMATRIX_VALS_KEY], key, p);
+    RELEASE_ASSERT(m_eParams.size() + m_sParams.size() == p);
+    fromJsonOutputViaList(parameters, jsonOutput[AMATRIX_PARAMS_KEY], key, p);
+    RELEASE_ASSERT(totalParams() == p);
 }
 
 /**
@@ -322,52 +430,48 @@ MatrixXd
 createQMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch, const double timeSinceEpochStart) {
     assert(epoch < schema.numEpochs());
 
-    bool anyAdjusted = false;
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch));
     // Skip this many epoch transition times.
-    size_t firstParamIdx = schema.m_eParams.size();
+    const size_t firstParamIdx = schema.m_eParamIdx.size();
     MatrixXd qMatrix = MatrixXd::Zero(nStates, nStates);
-    for (size_t p = 0; p < schema.m_sParams.size(); p++) {
-        const size_t paramIdx = firstParamIdx + p;
-        double pVal = schema.fromParam(parameters[paramIdx], paramIdx);
-        for (const auto& application : schema.m_sParams[p].applications) {
-            if (application.epoch == epoch) {
-                const Eigen::Index i = SIZE_T_TO_INDEX(application.i);
-                const Eigen::Index j = SIZE_T_TO_INDEX(application.j);
-                // Adjustments always come last. See model.py
-                if (application.adjust == ADJUST_GROWTH_RATE) {
-                    const double origRate = qMatrix(i, j);
-#if USE_AVG_COAL_RATE
-                    // The integral on interval {0, u} is (1/a - exp(-a*u)/a)
-                    // we can divide by alpha to get the average rate over time period lower:upper.
-                    const double integratedRate =
-                        (std::exp(pVal * timeSinceEpochStart) - 1) / (pVal * timeSinceEpochStart);
-                    qMatrix(i, j) = origRate * integratedRate * application.coeff;
-#elif USE_OVER_APPROX_COAL_RATE
-                    // rateB = base_rate * math.exp(r_EU * i)
-                    qMatrix(i, j) = origRate * std::exp(pVal * timeSinceEpochStart) * application.coeff;
-                    // std::cout << "OrigRate = " << origRate << ", NewRate = " << qMatrix(i, j) << "\n";
-#else
-                    static_assert(false, "Invalid preprocessor definition combination");
-#endif
-                    anyAdjusted = true;
-                } else if (application.adjust == ADJUST_INV_GROWTH_RATE) {
-                    // For backwards compatibility with JSON input files. Just ignore.
-                } else {
-                    qMatrix(i, j) += pVal * application.coeff;
-                    assert(!anyAdjusted);
+
+    auto applyParameter =
+        [&](const std::vector<VariableApplication>& applications, const double parameterValue, bool& anyAdjusted) {
+            for (const auto& application : applications) {
+                if (application.epoch == epoch) {
+                    const Eigen::Index i = SIZE_T_TO_INDEX(application.i);
+                    const Eigen::Index j = SIZE_T_TO_INDEX(application.j);
+                    // Adjustments always come last. See model.py
+                    if (application.adjust == ADJUST_GROWTH_RATE) {
+                        const double origRate = qMatrix(i, j);
+                        // The integral on interval {0, u} is (1/a - exp(-a*u)/a)
+                        // we can divide by alpha to get the average rate over time period lower:upper.
+                        const double integratedRate = (std::exp(parameterValue * timeSinceEpochStart) - 1) /
+                                                      (parameterValue * timeSinceEpochStart);
+                        qMatrix(i, j) = origRate * integratedRate * application.coeff;
+                        anyAdjusted = true;
+                    } else if (application.adjust == ADJUST_INV_GROWTH_RATE) {
+                        // For backwards compatibility with JSON input files. Just ignore.
+                    } else {
+                        qMatrix(i, j) += parameterValue * application.coeff;
+                        assert(!anyAdjusted);
+                    }
                 }
             }
-        }
+        };
+
+    // Apply the non-parameters first.
+    bool anyAdjusted = false;
+    for (const size_t index : schema.m_sFixedIdx) {
+        const auto& param = schema.m_sParams.at(index);
+        applyParameter(param.applications, param.init, anyAdjusted);
     }
-    for (const auto& param : schema.m_sFixed) {
-        for (const auto& application : param.applications) {
-            if (application.epoch == epoch) {
-                const Eigen::Index i = SIZE_T_TO_INDEX(application.i);
-                const Eigen::Index j = SIZE_T_TO_INDEX(application.j);
-                qMatrix(i, j) += param.init * application.coeff;
-            }
-        }
+    for (size_t i = 0; i < schema.m_sParamIdx.size(); i++) {
+        const size_t paramIdx = firstParamIdx + i;
+        RELEASE_ASSERT(paramIdx < schema.totalParams());
+        double pVal = schema.fromParam(parameters[paramIdx], paramIdx);
+        const size_t index = schema.m_sParamIdx[i];
+        applyParameter(schema.m_sParams.at(index).applications, pVal, anyAdjusted);
     }
     // Sum the off-diagonal and set the diagonal to the negative sum. This makes a valid
     // Q-matrix.
@@ -384,6 +488,42 @@ createQMatrix(const ParameterSchema& schema, double const* parameters, size_t ep
     verifyQMatrix(qMatrix);
 #endif
     return std::move(qMatrix);
+}
+
+#ifndef NDEBUG
+void verifyASMatrix(const MatrixXd& ASMatrix) {
+    const double nearlyZero = 0.000001;
+    for (Eigen::Index i = 0; i < ASMatrix.rows(); i++) {
+        MODEL_ASSERT_MSG(std::abs(1.0 - ASMatrix.row(i).sum()) <= nearlyZero, ASMatrix);
+        for (Eigen::Index j = 0; j < ASMatrix.cols(); j++) {
+            MODEL_ASSERT(ASMatrix(i, j) >= 0);
+        }
+    }
+}
+#endif
+
+/**
+ * Given the vector of concrete parameters values (parameters[]) and the current
+ * epoch, produce the concrete admixture proportion matrix.
+ */
+MatrixXd createASMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch) {
+    assert(epoch < schema.numEpochs());
+
+    std::vector<double> admixtureValues = getAdmixtureValues(schema, parameters);
+
+    // Now apply these values to construct the matrix, we leave off the coalescence state.
+    const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch) - 1);
+    MatrixXd ASMatrix = MatrixXd::Zero(nStates, nStates);
+    for (const auto& app : schema.m_admixtureApps) {
+        if (app.epoch == epoch) {
+            ASMatrix(SIZE_T_TO_INDEX(app.i), SIZE_T_TO_INDEX(app.j)) +=
+                app.coeff * admixtureValues.at(app.v1) * admixtureValues.at(app.v2);
+        }
+    }
+#ifndef NDEBUG
+    verifyASMatrix(ASMatrix);
+#endif
+    return std::move(ASMatrix);
 }
 
 inline size_t numTimeSlices(const std::vector<double>& timeSlices) { return timeSlices.size() + 1; }
@@ -411,9 +551,9 @@ ModelProbabilities probabilitiesUpToTime(const MatrixXd& sMatrix, const double t
     // - Sum to 1 (approximately, there will be floating pt error)
     // - Have no cell < 0
     // - Have no cell > 1
-    auto intermediate = sMatrix * timeK;
+    const MatrixXd intermediate = sMatrix * timeK;
     TRACE_MATRIX(intermediate, "exponential parameter @ t=" << timeK);
-    MatrixXd stateProbabilities = intermediate.exp();
+    const MatrixXd stateProbabilities = intermediate.exp();
     TRACE_MATRIX(stateProbabilities, "State probability @ t=" << timeK);
     const size_t N = stateProbabilities.cols(); // NxN matrix
     return {stateProbabilities.block(0, 0, N - 1, N - 1), stateProbabilities.topRightCorner(N - 1, 1)};
@@ -430,30 +570,38 @@ struct TimeMarker {
 // epoch boundary?) and which Epoch it belongs to.
 inline std::vector<TimeMarker> combineTimeVectors(const std::vector<double>& timeSlices,
                                                   const std::vector<double>& epochTimes) {
-    std::vector<TimeMarker> result;
-    size_t posT = 0;
-    size_t posE = 0;
+    std::vector<TimeMarker> tsAndEpoch;
     size_t epochCounter = 0;
-    while (posT < timeSlices.size() || posE < epochTimes.size()) {
-        if (posT >= timeSlices.size()) {
-            result.push_back({epochTimes[posE], ++epochCounter, false});
-            posE++;
-        } else if (posE >= epochTimes.size()) {
-            result.push_back({timeSlices[posT], epochCounter, true});
-            posT++;
-        } else if (timeSlices[posT] < epochTimes[posE]) {
-            result.push_back({timeSlices[posT], epochCounter, true});
-            posT++;
-        } else if (timeSlices[posT] == epochTimes[posE]) {
-            result.push_back({timeSlices[posT], ++epochCounter, true});
-            posT++;
-            posE++;
-        } else {
-            result.push_back({epochTimes[posE], ++epochCounter, false});
-            posE++;
+    {
+        size_t posT = 0;
+        size_t posE = 0;
+        while (posT < timeSlices.size() || posE < epochTimes.size()) {
+            if (posT >= timeSlices.size()) {
+                tsAndEpoch.push_back({epochTimes[posE], ++epochCounter, false});
+                posE++;
+            } else if (posE >= epochTimes.size()) {
+                tsAndEpoch.push_back({timeSlices[posT], epochCounter, true});
+                posT++;
+            } else if (timeSlices[posT] < epochTimes[posE]) {
+                tsAndEpoch.push_back({timeSlices[posT], epochCounter, true});
+                posT++;
+            } else if (timeSlices[posT] == epochTimes[posE]) {
+                tsAndEpoch.push_back({timeSlices[posT], ++epochCounter, true});
+                posT++;
+                posE++;
+            } else {
+                tsAndEpoch.push_back({epochTimes[posE], ++epochCounter, false});
+                posE++;
+            }
         }
     }
-    return std::move(result);
+    return std::move(tsAndEpoch);
+}
+
+static inline void rowNorm(MatrixXd& matrix) {
+    for (Eigen::Index j = 0; j < matrix.rows(); j++) {
+        matrix.row(j).array() /= matrix.row(j).sum();
+    }
 }
 
 /**
@@ -464,13 +612,10 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
                                   double const* parameters,
                                   const std::vector<double>& timeSlices,
                                   const std::vector<double>& epochTimes,
-                                  const MatrixXd& popConvert,
                                   std::vector<std::pair<double, MatrixXd>>* qMatricesByTime = nullptr) {
     const size_t numEpochs = schema.numEpochs();
     assert(numEpochs > 0);
     assert(numEpochs == epochTimes.size() + 1);
-    // Each row of popConvert is for the transition between epoch e and epoch e+1
-    assert(numEpochs == popConvert.rows() + 1);
 
     // Combine all the times into a single timeline just to simplify things.
     std::vector<TimeMarker> allTimes = combineTimeVectors(timeSlices, epochTimes);
@@ -482,19 +627,14 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
     // fewer states we always have to map them back to Epoch0's states.
     const Eigen::Index nStatesEpoch0 = SIZE_T_TO_INDEX(schema.numStates(0)) - 1;
 
-    // Maps the current epoch's states back to Epoch0. E.g., if position "i" has
-    // value "k", it means that state "k" in the current epoch maps back to state
-    // "i" in Epoch0.
-    const double minPop = 0;
-    const double maxPop = (double)nStatesEpoch0 - 1;
-    VectorXd currentStateMap = VectorXd::LinSpaced(nStatesEpoch0, minPop, maxPop);
+    // Maps the current epoch's states back to Epoch0, in proportions.
+    MatrixXd currentStateMap = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
     // Resulting coalescence probabilities per time slice
     const Eigen::Index nTimeBins = SIZE_T_TO_INDEX(timeSlices.size()) + 1;
     MatrixXd probsByTime = MatrixXd::Ones(nStatesEpoch0, nTimeBins);
     // The probability of non-coalescence states at the end of the previous epoch.
-    // This is the "starting state" of the current epoch. EOPE = "end of previous
-    // epoch"
-    MatrixXd migrationStateProbsEOPE = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
+    // This is the "starting state" of the current epoch, and is updated at the end of each epoch.
+    MatrixXd currentStateProbs = MatrixXd::Identity(nStatesEpoch0, nStatesEpoch0);
 #if FEWER_SUBTRACTIONS_PER_EPOCH
     // The probability that a state has coalesced by the end of the last epoch.
     VectorXd probCoalByLastEpoch = VectorXd::Zero(nStatesEpoch0);
@@ -518,7 +658,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
         }
 
         ModelProbabilities probabilities = probabilitiesUpToTime(curMatrix, deltaT);
-        probabilities.coalescence = migrationStateProbsEOPE * probabilities.coalescence(currentStateMap, 0);
+        probabilities.coalescence = currentStateProbs * probabilities.coalescence;
         TRACE_MATRIX(probabilities.coalescence,
                      "coalescence probabilities in epoch " << currentEpoch << " up to time " << time);
 
@@ -545,20 +685,23 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
             assert(newEpoch == currentEpoch + 1);
 
             // Map our current location probabilities back to the epoch0 locations.
-            MatrixXd locProbMappedToEpoch0 = probabilities.locations(currentStateMap, currentStateMap);
+            MatrixXd locProbMappedToEpoch0 = currentStateMap * probabilities.locations;
             TRACE_MATRIX(locProbMappedToEpoch0, "End of epoch " << currentEpoch << " locs");
             // locProbMappedToEpoch0 contains the location probabilities in terms of
             // the initial states, but only for the time period between the end of the
             // previous epoch (E_k) and the start of the current time slice (which is
             // the start of a new epoch, E_k+2). This reweights all the migration
             // states based on the location probabilities at the end of E_k.
-            migrationStateProbsEOPE = migrationStateProbsEOPE * locProbMappedToEpoch0;
-            TRACE_MATRIX(migrationStateProbsEOPE, " ... multiplied by end of previous epoch");
-            // Normalize each row to be a probability.
-            for (Eigen::Index j = 0; j < migrationStateProbsEOPE.rows(); j++) {
-                migrationStateProbsEOPE.row(j).array() /= migrationStateProbsEOPE.row(j).sum();
-            }
-            TRACE_MATRIX(migrationStateProbsEOPE, " ... normalized and converted to EOPE");
+            currentStateProbs = currentStateProbs * locProbMappedToEpoch0;
+            TRACE_MATRIX(currentStateProbs, " ... multiplied by end of previous epoch");
+            rowNorm(currentStateProbs); // Normalize each row to be a probability.
+            TRACE_MATRIX(currentStateProbs, " ... normalized and converted to EOPE");
+
+            const auto ASMatrix = createASMatrix(schema, parameters, newEpoch);
+            TRACE_MATRIX(ASMatrix, "ASMatrix(" << newEpoch << ")");
+            currentStateMap = currentStateMap * ASMatrix;
+            TRACE_MATRIX(currentStateMap, "currentStateMap(" << newEpoch << ")");
+            currentStateProbs = currentStateProbs * currentStateMap;
 
 #if FEWER_SUBTRACTIONS_PER_EPOCH
             probCoalByLastEpoch = ((probCoalByLastEpoch.array() + probabilities.coalescence.array()) -
@@ -572,7 +715,6 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 #endif
 
             epochStart = time;
-            currentStateMap = popConvert.row(SIZE_T_TO_INDEX(currentEpoch));
             currentEpoch = newEpoch;
         }
     }
@@ -599,7 +741,6 @@ class ObservedData {
 public:
     std::vector<MatrixXd> countMatrices;
     std::vector<double> timeSlices;
-    MatrixXd popConvert;
 };
 
 class CachedCMatrix {
@@ -642,7 +783,6 @@ NegLogLikelihoodCostFunctor::NegLogLikelihoodCostFunctor(const std::string& json
     }
     m_observed->timeSlices = ::getTimeSlices(inputJson);
     m_schema.load(inputJson);
-    m_observed->popConvert = loadPopConversion(inputJson);
 
 #if DEBUG_OUTPUT
     std::cerr << "Loaded " << m_observed->countMatrices.size() << " count matrices" << std::endl;
@@ -716,17 +856,11 @@ inline double computeLLForTime(Eigen::Index timeK, const MatrixXd& probabilityAt
 }
 
 double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
-    std::vector<double> epochTimes; // One for each transition between epochs
-    epochTimes.reserve(m_schema.numEpochs() - 1);
-    for (size_t epoch = 0; epoch < m_schema.numEpochs(); epoch++) {
-        if (epoch > 0) {
-            epochTimes.emplace_back(m_schema.getEpochStartTime(parameters, epoch));
-        }
-    }
+    // One for each transition between epochs
+    std::vector<double> epochTimes = m_schema.getEpochStartTimes(parameters);
     double cost = 0.0;
     try {
-        auto probabilityAtTime =
-            modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, m_observed->popConvert);
+        auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
         RELEASE_ASSERT(m_cache->isSet);
         for (Eigen::Index timeK = 0; timeK < probabilityAtTime.cols(); timeK++) {
             const double ll = computeLLForTime(timeK, probabilityAtTime, m_cache->matrix);
@@ -763,16 +897,9 @@ double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
 }
 
 void NegLogLikelihoodCostFunctor::outputTheoreticalCoalMatrix(double const* parameters, std::ostream& out) const {
-    std::vector<double> epochTimes;
-    epochTimes.reserve(m_schema.numEpochs() - 1);
-    for (size_t epoch = 0; epoch < m_schema.numEpochs(); epoch++) {
-        if (epoch > 0) {
-            epochTimes.emplace_back(m_schema.getEpochStartTime(parameters, epoch));
-        }
-    }
+    std::vector<double> epochTimes = m_schema.getEpochStartTimes(parameters);
 
-    auto probabilityAtTime =
-        modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, m_observed->popConvert);
+    auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
 
     json outputJson = m_schema.toJsonOutput(parameters, std::numeric_limits<double>::quiet_NaN());
     std::vector<std::vector<double>> matrix;
