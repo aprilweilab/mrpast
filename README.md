@@ -36,6 +36,20 @@ MRPAST_ENABLE_NATIVE=1 pip install mrpast/
 MRPAST_DEBUG=1 pip install mrpast/
 ```
 
+## IMPORTANT: NEW MODEL FORMAT
+
+If you used MrPast prior to August 14, 2025, you may have models in the "old" format. The new format attempts
+to be more user friendly. See [the examples](https://github.com/aprilweilab/mrpast/tree/main/examples) for the
+new format.
+
+To convert an "old style" model, `foo.yaml` to the new style, just do:
+```
+mrpast init --from-old-mrpast foo.yaml > foo.new.yaml
+```
+
+The documentation is still not updated w/r/t the new model format, but hopefully the examples are sufficient to
+explain the changes.
+
 ## Usage
 
 There are three primary subcommands to `mrpast`, and they are usually run in this order:
