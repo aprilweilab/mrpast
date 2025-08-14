@@ -1,3 +1,5 @@
+# OutOfAfrica_4J17 from stdpopsim, converted from the Demes model that was exported
+# from stdpopsim. From Jouganous et al. (2017).
 ploidy: 2
 pop_count: 4
 pop_names:

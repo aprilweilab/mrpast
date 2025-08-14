@@ -1,9 +1,16 @@
+# stdpopsim model OutOfAfrica_2T12, according to which:
+# "Model parameters are taken from Fig. S5 in Fu et al. (2013)"
+
+# Diploid individuals.
 ploidy: 2
-pop_count: 2
+# The names of population0 and population1, respectively.
 pop_names:
 - AFR
 - EUR
+# The coalescence rate parameterization, which is REQUIRED.
 coalescence:
+  # Demes can be referenced by number (0, 1) or name (AFR, EUR). Rate values can be either
+  # constants (just a float value) or a parameter reference of the form {"param": <index>}
   entries:
   - {"epoch": 0, "deme": "AFR", "rate": {"param": 3}}
   - {"epoch": 0, "deme": "EUR", "rate": {"param": 6}}
@@ -13,6 +20,7 @@ coalescence:
   - {"epoch": 2, "deme": "EUR", "rate": {"param": 4}}
   - {"epoch": 3, "deme": "AFR", "rate": {"param": 2}}
   - {"epoch": 4, "deme": "AFR", "rate": {"param": 1}}
+  # These indexes specified by these parameters matches up with the parameter references above.
   parameters:
   - {"ground_truth": 6.839945280437756e-05, "lb": 1e-07, "ub": 0.01, "index": 1}
   - {"ground_truth": 3.45447008428907e-05, "lb": 1e-07, "ub": 0.01, "index": 2}
@@ -20,6 +28,7 @@ coalescence:
   - {"ground_truth": 0.00026867275658248256, "lb": 1e-07, "ub": 0.01, "index": 4}
   - {"ground_truth": 5.388388380070718e-05, "lb": 1e-07, "ub": 0.01, "index": 5}
   - {"ground_truth": 9.971355417745619e-07, "lb": 1e-07, "ub": 0.01, "index": 6}
+# Growth rates are optional.
 growth:
   entries:
   - {"epoch": 0, "deme": "AFR", "rate": {"param": 1}}
@@ -29,7 +38,11 @@ growth:
   - {"ground_truth": 0.0166, "lb": 0.001, "ub": 0.05, "index": 1}
   - {"ground_truth": 0.0030700000000000002, "lb": 0.001, "ub": 0.05, "index": 2}
   - {"ground_truth": 0.0195, "lb": 0.001, "ub": 0.05, "index": 3}
+# Migration rates are optional.
 migration:
+  # The source/dest are with respect to BACKWARDS IN TIME. Everything in MrPast models is
+  # backwards in time. So "source" is where lineages are migrating _from_ backwards in time
+  # and where lineages are migrating _to_ forwards in time.
   entries:
   - {"epoch": 0, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
   - {"epoch": 0, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
@@ -40,11 +53,16 @@ migration:
   parameters:
   - {"ground_truth": 0.00015, "lb": 1e-05, "ub": 0.01, "index": 1}
   - {"ground_truth": 2.5e-05, "lb": 1e-05, "ub": 0.01, "index": 2}
+# The epoch splits are required, unless there is only a single epoch. If you have 4 splits
+# then there are 5 epochs.
 epochTimeSplit:
 - {"ground_truth": 204.6, "lb": 100.0, "ub": 562.0, "index": 1}
 - {"ground_truth": 920.0, "lb": 562.0, "ub": 1480.0, "index": 2}
 - {"ground_truth": 2040.0, "lb": 1480.0, "ub": 3980.0, "index": 3}
 - {"ground_truth": 5920.0, "lb": 3980.0, "ub": 7910.0, "index": 4}
+# This admixture is just a population split, since the proportion is 1.0. After a split
+# occurs (backward in time) the derived population ceases to exist and should not be
+# referenced in any of the epochs where it is "dead"
 admixture:
   entries:
   - {"epoch": 3, "ancestral": "AFR", "derived": "EUR", "proportion": 1.0}

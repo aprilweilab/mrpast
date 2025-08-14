@@ -1,3 +1,7 @@
+# OutOfAfrica_3G09 from stdpopsim, modified to have a growth rate for YRI in the most recent epoch,
+# and with parameter values as inferred from mrpast+tsinfer on 30 individuals/deme in high-coverage
+# 1,000 Genomes Project dataset.
+# Values taken from the median of 100 bootstraps.
 ploidy: 2
 pop_count: 3
 pop_names:

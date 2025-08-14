@@ -1,3 +1,7 @@
+# stdpopsim model OutOfAfrica_2T12+ExtendedNeanderthalAdmixture, OutOfAfrica_2T12 is according to which:
+# "Model parameters are taken from Fig. S5 in Fu et al. (2013)"
+# ExtendedNeanderthalAdmixture is added in based on OutOfAfricaExtendedNeandertalAdmixturePulse_3I21 from
+# paper Iasi et al. (2021) with some changes to increase the extended pulse a little bit.
 ploidy: 2
 pop_count: 3
 pop_names:
