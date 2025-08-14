@@ -247,6 +247,8 @@ private:
                              const ParameterSchema::VarList& paramVars,
                              const std::vector<size_t>& paramIdx) const;
 
+    void fromJsonOutputViaList(double* parameters, const json& jsonList, const std::string& key, size_t& index) const;
+
     // We save the actual JSON object, because the output is identical to the
     // input except for
     // some additional fields. This way we can just copy this JSON object for the
@@ -267,16 +269,21 @@ private:
 
 template <typename T>
 void ParameterSchema::addToParamOutput(json& outputData, const std::string& field, const std::vector<T>& data) {
-    RELEASE_ASSERT(false); // FIXME
+    RELEASE_ASSERT(data.size() == totalParams());
     size_t p = 0;
     json& epochTimes = outputData[EPOCH_TIMES_KEY];
-    for (size_t i = 0; i < m_eParams.size(); i++) {
-        epochTimes[i][field] = data[p];
+    for (const size_t i : m_eParamIdx) {
+        epochTimes.at(i)[field] = data.at(p);
         p++;
     }
     json& sMatrixValues = outputData[SMATRIX_VALS_KEY];
-    for (size_t i = 0; i < m_sParams.size(); i++) {
-        sMatrixValues[i][field] = data[p];
+    for (const size_t i : m_sParamIdx) {
+        sMatrixValues.at(i)[field] = data.at(p);
+        p++;
+    }
+    json& aMatrixValues = outputData[AMATRIX_PARAMS_KEY];
+    for (const size_t i : m_aParamIdx) {
+        aMatrixValues.at(i)[field] = data.at(p);
         p++;
     }
 }

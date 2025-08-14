@@ -363,10 +363,12 @@ def load_old_mrpast(yaml_file: str) -> UserModel:
     """
     with open(yaml_file) as f:
         config = load(f, Loader=Loader)
-        mig_params = map(FloatParameter.from_dict, config["migration"]["parameters"])
+        mig_params = map(
+            FloatParameter.from_dict, config["migration"]["parameters"] or []
+        )
         mig_entries = []
         pop_count = 0
-        for e, m in enumerate(config["migration"]["matrices"]):
+        for e, m in enumerate(config["migration"]["matrices"] or []):
             m = numpy.array(m)
             pop_count = max(pop_count, m.shape[1])
             for i in range(m.shape[0]):

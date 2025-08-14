@@ -156,7 +156,8 @@ void loadParamList(const json& parameterList,
                    std::vector<size_t>& freeParamIdx,
                    std::vector<size_t>& fixedParamIdx,
                    std::vector<size_t>& oneMinusIdx,
-                   std::vector<double>& rescaling) {
+                   std::vector<double>& rescaling,
+                   const bool isEpoch = false) {
     for (const auto& parameter : parameterList) {
         std::vector<size_t> oneMinus;
         if (parameter.contains("one_minus")) {
@@ -171,7 +172,11 @@ void loadParamList(const json& parameterList,
             oneMinusIdx.push_back(allParams.size());
         } else {
             freeParamIdx.push_back(allParams.size());
-            rescaling.emplace_back(1.0);
+            if (isEpoch) {
+                rescaling.emplace_back(EPOCH_TIME_RESCALE);
+            } else {
+                rescaling.emplace_back(1.0);
+            }
         }
         BoundedVariable bv = {parameter["init"],
                               parameter["lb"],
@@ -190,7 +195,8 @@ void ParameterSchema::load(const json& inputData) {
     m_inputJson = inputData;
     std::vector<size_t> ignored;
     // EPOCH PARAMETERS
-    loadParamList(inputData.at(EPOCH_TIMES_KEY), m_eParams, m_eParamIdx, m_eFixedIdx, ignored, m_paramRescale);
+    loadParamList(
+        inputData.at(EPOCH_TIMES_KEY), m_eParams, m_eParamIdx, m_eFixedIdx, ignored, m_paramRescale, /*isEpoch=*/true);
     m_numEpochs = m_eParams.size() + 1;
     m_sStates = std::vector<size_t>(m_numEpochs);
     // STOCHASTIC MATRIX (Q-Matrix) PARAMETERS
@@ -391,23 +397,26 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
     return std::move(output);
 }
 
+void ParameterSchema::fromJsonOutputViaList(double* parameters,
+                                            const json& jsonList,
+                                            const std::string& key,
+                                            size_t& index) const {
+    for (const auto& paramVal : jsonList) {
+        if (!isJsonParamFixed(paramVal)) {
+            parameters[index] = toParam((double)paramVal[key], index);
+            index++;
+        }
+    }
+}
+
 void ParameterSchema::fromJsonOutput(const json& jsonOutput, double* parameters, std::string key) const {
-    RELEASE_ASSERT(false); // FIXME
     size_t p = 0;
-    for (const auto& paramVal : jsonOutput[EPOCH_TIMES_KEY]) {
-        if (!isJsonParamFixed(paramVal)) {
-            parameters[p] = toParam((double)paramVal[key], p);
-            p++;
-        }
-    }
+    fromJsonOutputViaList(parameters, jsonOutput[EPOCH_TIMES_KEY], key, p);
     RELEASE_ASSERT(m_eParams.size() == p);
-    for (const auto& paramVal : jsonOutput[SMATRIX_VALS_KEY]) {
-        if (!isJsonParamFixed(paramVal)) {
-            parameters[p] = toParam((double)paramVal[key], p);
-            p++;
-        }
-    }
-    RELEASE_ASSERT(m_sParams.size() + m_eParams.size() == p);
+    fromJsonOutputViaList(parameters, jsonOutput[SMATRIX_VALS_KEY], key, p);
+    RELEASE_ASSERT(m_eParams.size() + m_sParams.size() == p);
+    fromJsonOutputViaList(parameters, jsonOutput[AMATRIX_PARAMS_KEY], key, p);
+    RELEASE_ASSERT(totalParams() == p);
 }
 
 /**

@@ -230,7 +230,7 @@ bool checkCostFunc(const NegLogLikelihoodCostFunctor& cost) {
 /**
  * Get the J and H matrices for the likelihood function.
  *
- * @param[in] fixNonInvertible When set to 1, attempt to fix non-invertible H
+ * @param[in] fixNonInvertible When set to true, attempt to fix non-invertible H
  *  matrices by holding one of the parameters at a constant value (and otherwise
  *  ignoring it in all all derivative calculations). Rarely needed now that we
  *  scale the epoch times. USE WITH CAUTION.

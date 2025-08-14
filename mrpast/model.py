@@ -36,9 +36,6 @@ def load_model_config(filename: str) -> Dict[str, Any]:
     with open(filename) as f:
         config = load(f, Loader=Loader)
     assert (
-        "migration" in config
-    ), "Model configuration must contain at least one migration matrix"
-    assert (
         "coalescence" in config
     ), "Model configuration must contain at least one coalescence matrix"
     return config
@@ -301,14 +298,14 @@ class DemeDemeRates(ParamContainer):
     # Oldest epoch number referenced.
     @property
     def max_epoch(self) -> int:
-        return max(map(lambda e: e.epoch, self.entries))
+        return max(list(map(lambda e: e.epoch, self.entries)) + [0])
 
     # Largest deme number referenced.
     @property
     def max_deme(self) -> int:
         return max(
-            max(map(lambda e: int(e.source), self.entries)),
-            max(map(lambda e: int(e.dest), self.entries)),
+            max(list(map(lambda e: int(e.source), self.entries)) + [0]),
+            max(list(map(lambda e: int(e.dest), self.entries)) + [0]),
         )
 
     def get_entry(self, epoch: int, source: int, dest: int) -> Optional[DemeDemeEntry]:
