@@ -172,7 +172,7 @@ def load_json_pandas(
             )
             result.append(p)
             ncounter += 1
-    for acounter, p in enumerate(data["amatrix_parameters"]):
+    for acounter, p in enumerate(data.get("amatrix_parameters", []) or []):
         v = clamp(p, p["final"])
         del p["apply_to"]
         is_fixed = _param_is_fixed(p)
@@ -330,7 +330,7 @@ def draw_graphs(
 
     avg_mig = 0.0
     for p in model.migration.parameters:
-        avg_mig += get_mig_value(p.ground_truth)
+        avg_mig += p.ground_truth
     avg_mig /= len(model.migration.parameters)
 
     max_popsize = 0
@@ -421,13 +421,12 @@ def draw_graphs(
 
     # Colorbar "legend"
     norm_weights = mpl.colors.Normalize(vmin=min(weights), vmax=max(weights))
-    if cax is None:
-        cax = ax
-    plt.colorbar(
-        plt.cm.ScalarMappable(cmap=cmap, norm=norm_weights),
-        orientation="vertical",
-        cax=cax,
-    )
+    if cax is not None:
+        plt.colorbar(
+            plt.cm.ScalarMappable(cmap=cmap, norm=norm_weights),
+            orientation="vertical",
+            cax=cax,
+        )
 
 
 def get_matching_colors(num_demes, demes=[]):
