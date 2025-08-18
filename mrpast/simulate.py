@@ -19,10 +19,10 @@ from tqdm import tqdm
 from multiprocessing import Pool
 from typing import Tuple, List, Union
 import msprime
-import os
 
 from mrpast.helpers import (
     load_ratemap,
+    one_file_or_one_per_chrom,
 )
 from mrpast.model import UserModel, ParamRef
 
@@ -244,47 +244,38 @@ def run_simulation(
 ) -> int:
     # If user provided a filename, load it as recombination map
     if isinstance(recomb_rate, str):
-        assert os.path.isfile(
-            recomb_rate
-        ), "Invalid recombination rate: provide a filename or constant rate"
-        recomb_rate_or_map = load_ratemap(recomb_rate)
-        # msprime is really picky about the ratemap length exactly matching the
-        # length of the simulated sequence.
-        recomb_rate_or_map = recomb_rate_or_map.slice(left=0, right=seq_len, trim=True)
-    else:
-        recomb_rate_or_map = float(recomb_rate)
+        file_list = one_file_or_one_per_chrom(
+            recomb_rate,
+            list(map(str, range(num_replicates))),
+            ".txt",
+            desc="recombination map",
+        )
 
-    if num_replicates % jobs == 0:
-        reps_per_job = num_replicates // jobs
-        work = [
-            (
-                model,
-                arg_prefix,
-                seq_len,
-                reps_per_job,
-                ident,
-                recomb_rate_or_map,
-                samples_per_pop,
-                debug_demo,
-                seed + ident,
-            )
-            for ident in range(jobs)
-        ]
+        def load_rm(filename):
+            rm = load_ratemap(filename)
+            # msprime is really picky about the ratemap length exactly matching the
+            # length of the simulated sequence.
+            return rm.slice(left=0, right=seq_len, trim=True)
+
+        rates_per_rep = list(map(load_rm, file_list))
     else:
-        work = [
-            (
-                model,
-                arg_prefix,
-                seq_len,
-                1,
-                ident,
-                recomb_rate_or_map,
-                samples_per_pop,
-                debug_demo,
-                seed + ident,
-            )
-            for ident in range(num_replicates)
-        ]
+        rates_per_rep = [float(recomb_rate)] * num_replicates
+    assert len(rates_per_rep) == num_replicates
+
+    work = [
+        (
+            model,
+            arg_prefix,
+            seq_len,
+            1,
+            ident,
+            rate_map,
+            samples_per_pop,
+            debug_demo,
+            seed + ident,
+        )
+        for ident, rate_map in zip(range(num_replicates), rates_per_rep)
+    ]
     if jobs == 1:
         tree_counts = [_run_simulation(*work[0])]
     else:

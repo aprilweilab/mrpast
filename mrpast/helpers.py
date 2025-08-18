@@ -16,12 +16,13 @@
 from typing import Optional, List, Union, Tuple
 from copy import deepcopy
 from yaml import load, dump
+import glob
 import json
+import numpy
 import os
 import subprocess
 import sys
 import tempfile
-import numpy
 import msprime
 from mrpast.model import (
     AdmixtureEntry,
@@ -421,3 +422,31 @@ def load_old_mrpast(yaml_file: str) -> UserModel:
             admixture=AdmixtureGroup(admix_entries, []),
         )
         return result
+
+
+def one_file_or_one_per_chrom(
+    filename_or_prefix: str,
+    other_files: List[str],
+    ext: str,
+    abspath: bool = True,
+    desc: str = "per-chromosome",
+) -> List[str]:
+    """
+    Take a user-input string that can be a filename with a particular extension, or a prefix
+    to be matched against a glob with that extension. These are matched against an input list
+    of other files (usually ARGs) that will be sorted in the same order.
+
+    Returns a list of filenames of the same length as other_files, in sorted ascending order.
+    """
+    if abspath:
+        pth = os.path.abspath
+    else:
+        pth = lambda p: p
+    if filename_or_prefix.endswith(ext) and os.path.isfile(filename_or_prefix):
+        result = [pth(filename_or_prefix)] * len(other_files)
+    else:
+        result = list(map(pth, sorted(glob.glob(f"{filename_or_prefix}*{ext}"))))
+        assert len(result) == len(
+            other_files
+        ), f"Expected given {desc} filename prefix to match {len(other_files)} files (one per chromosome), but instead matched {len(result)}"
+    return result
