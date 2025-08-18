@@ -25,7 +25,14 @@ import tempfile
 import tskit
 import uuid
 
-from mrpast.helpers import which, run, remove_ext, load_ratemap, MAX_CHROM_SIZE
+from mrpast.helpers import (
+    which,
+    run,
+    remove_ext,
+    load_ratemap,
+    MAX_CHROM_SIZE,
+    one_file_or_one_per_chrom,
+)
 from mrpast.model import PopMap
 
 
@@ -780,26 +787,17 @@ def infer_arg(
 
     recomb_list: List[Union[float, str]] = []
     if isinstance(recomb, str):
-        if recomb.endswith(".txt") and os.path.isfile(recomb):
-            recomb_list = [os.path.abspath(recomb)]
-        else:
-            recomb_list = list(
-                map(os.path.abspath, sorted(glob.glob(f"{recomb}*.txt")))
-            )
+        recomb_list = one_file_or_one_per_chrom(
+            recomb, vcf_files, ".txt", desc="recombination map"
+        )
     else:
-        recomb_list = [recomb]
-    if len(recomb_list) == 1:
-        recomb_list = recomb_list * len(vcf_files)
-    assert len(vcf_files) == len(
-        recomb_list
-    ), f"You must provide either a single recombination rate/map, or exactly one for each VCF/VCZ. Saw {len(vcf_files)} input files and {len(recomb_list)} map files."
+        recomb_list = [recomb] * len(vcf_files)
     fasta_list: List[Optional[str]] = []
     if isinstance(fasta, str):
         # Matched by lexicographic ordering. I.e., chr1.fa matches to chr1.vcf via order of the name.
-        fasta_list = list(map(os.path.abspath, sorted(glob.glob(f"{fasta}*.fa"))))
-        assert len(fasta_list) == len(
-            vcf_files
-        ), "You must provide an ancestral FASTA file pattern than matches one file for each VCF/VCZ"
+        fasta_list = one_file_or_one_per_chrom(
+            fasta, vcf_files, ".fa", desc="recombination map"
+        )
     else:
         fasta_list = [fasta] * len(vcf_files)
 

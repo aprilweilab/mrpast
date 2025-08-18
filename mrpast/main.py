@@ -45,6 +45,7 @@ from mrpast.helpers import (
     remove_ext,
     which,
     load_old_mrpast,
+    one_file_or_one_per_chrom,
 )
 from mrpast.simulate import (
     run_simulation,
@@ -214,7 +215,7 @@ def get_coaldist_from_arg(
     leave_out_pops=[],
     min_time_unit=1.0,
     tree_sample_rate: int = DEFAULT_TREE_SAMPLE_RATE,
-    rate_maps: List[str] = [],
+    rate_maps: Optional[str] = None,
     rate_map_threshold: float = 1.0,
 ) -> List[str]:
     # Load the ARG from the tree-sequence(s) and bin the coalescence times.
@@ -226,7 +227,7 @@ def get_coaldist_from_arg(
     print(f"Found {len(tree_files)} tree files")
 
     expanded_rate_maps: List[Optional[str]] = []
-    if rate_maps:
+    if rate_maps is not None:
         # Group by "chromosome" (for simulation, this is just numbered replicated, but you can think of them
         # as being independently evolving chromosomes under the same demographic constraints). Once we have
         # the group we can match the rate_maps to the group.
@@ -240,13 +241,15 @@ def get_coaldist_from_arg(
                 group_id = m.group(1)
                 grouped[group_id].append(fn)
 
-        assert len(rate_maps) == len(grouped), (
-            "--rate-maps must have same number of files as ARGs after grouping by chromosome/replicate."
-            f" Found {len(rate_maps)} rate maps and {len(grouped)} groups of ARGs"
+        group_ids = list(sorted(grouped.keys()))
+        rate_map_list = one_file_or_one_per_chrom(
+            rate_maps, group_ids, ".txt", desc="recombination map"
         )
+        assert len(rate_map_list) == len(grouped)
+
         tree_files = []
         expanded_rate_maps = []
-        for group_key, rate_map in zip(sorted(grouped.keys()), sorted(rate_maps)):
+        for group_key, rate_map in zip(group_ids, rate_map_list):
             for tree_file in grouped[group_key]:
                 tree_files.append(tree_file)
                 expanded_rate_maps.append(rate_map)
@@ -511,7 +514,7 @@ def process_ARGs(
     group_by: Optional[str] = None,
     time_slice_str: Optional[str] = None,
     verbose: bool = False,
-    rate_maps: List[str] = [],
+    rate_maps: Optional[str] = None,
     rate_map_threshold: float = 1.0,
     left_skew_times: bool = False,
     seed: int = DEFAULT_RANDOM_SEED,
@@ -642,9 +645,9 @@ def main():
     simulate_parser.add_argument(
         "--recomb-rate",
         "-e",
-        type=float_or_filename,
+        type=float_or_str,
         default=DEFAULT_RECOMB_RATE,
-        help=f"Rate of recombination, or filename for recombination map. Defaults to {DEFAULT_RECOMB_RATE}.",
+        help=f"Rate of recombination, or filename/prefix for recombination map. A prefix will match '<prefix>*.txt'. Defaults to {DEFAULT_RECOMB_RATE}.",
     )
     simulate_parser.add_argument(
         "--individuals",
@@ -991,7 +994,6 @@ def main():
         )
         print(f"Wrote {total_trees} total marginal trees")
     elif args.command == CMD_PROCESS:
-        rate_maps = list(glob.glob(f"{args.rate_maps}"))
         num_times, left_skew = args.num_times
         if left_skew is not None:
             assert left_skew.lower() == "l"
@@ -1017,7 +1019,7 @@ def main():
             group_by=args.group_by,
             time_slice_str=args.time_slices,
             verbose=args.verbose,
-            rate_maps=rate_maps,
+            rate_maps=args.rate_maps,
             rate_map_threshold=args.rate_map_threshold,
             left_skew_times=left_skew,
             seed=args.seed,
