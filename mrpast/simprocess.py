@@ -565,7 +565,7 @@ def simulate_muts_and_export(
             f,
             individuals=emit_indivs,
             individual_names=list(map(lambda i: f"tsk_{i}", emit_indivs)),
-            allow_position_zero=True,
+            position_transform=lambda pos_list: [m + 1 for m in pos_list],
         )
 
     # This assumes that tskit is emitting the samples in the order that we requested
