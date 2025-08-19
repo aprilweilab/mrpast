@@ -495,6 +495,17 @@ def float_or_str(arg_value):
         return str(arg_value)
 
 
+def time_slice_list(time_slice_str: Optional[str]) -> Tuple[List[float], bool]:
+    if time_slice_str is None:
+        return ([], False)
+    is_extra = False
+    if time_slice_str.startswith("+"):
+        time_slice_str = time_slice_str[1:]
+        is_extra = True
+    time_list = list(map(float, time_slice_str.split(",")))
+    return (time_list, is_extra)
+
+
 def process_ARGs(
     model: str,
     arg_prefix: str,
@@ -566,12 +577,14 @@ def process_ARGs(
 
     # Get time slices and coal matrices - this may produce many matrices if we are using
     # a sampling strategy like bootstrap or jackknife.
-    if time_slice_str is None:
+    ts_list, ts_is_extra = time_slice_list(time_slice_str)
+    if not ts_list or ts_is_extra:
         time_slices = get_time_slices(
             coal_filenames, num_times, max_generation, left_skewed=left_skew_times
         )
+        time_slices = sorted(time_slices + ts_list)
     else:
-        time_slices = list(map(float, time_slice_str.split(",")))
+        time_slices = ts_list
 
     coal_matrices, sampling_description, sampling_hashes = get_coal_counts(
         model,
@@ -759,11 +772,12 @@ def main():
     process_parser.add_argument(
         "--time-slices",
         default=None,
-        help=f"The comma-separated list of time slice values instead of computing them from coalescence counts.",
+        help=f"The comma-separated list of time slice values instead of computing them from coalescence counts. "
+        "Or, if prefixed with '+', the list of time slices to append to the auto-generated time slices.",
     )
     process_parser.add_argument(
         "--rate-maps",
-        default="",
+        default=None,
         help=f"A filename prefix for tskit-style RateMap files, whose lexicographic sort order matches the input ARGs "
         "lexicographic sort order. Generates a glob '<prefix>*.txt'. Used for determining tree sampling (see --rate-map-threshold)",
     )
