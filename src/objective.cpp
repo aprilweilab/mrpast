@@ -346,7 +346,11 @@ std::vector<double> getAdmixtureValues(const ParameterSchema& schema, double con
         for (const size_t otherIndex : schema.m_aParams.at(index).oneMinus) {
             sum += admixtureValues.at(otherIndex);
         }
-        admixtureValues.at(index) = 1.0 - sum;
+        if (sum < 1.0) {
+            admixtureValues.at(index) = 1.0 - sum;
+        } else {
+            admixtureValues.at(index) = 0.0;
+        }
     }
     return std::move(admixtureValues);
 }
