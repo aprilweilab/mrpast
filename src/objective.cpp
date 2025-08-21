@@ -418,9 +418,9 @@ void ParameterSchema::fromJsonOutputViaList(double* parameters,
 void ParameterSchema::fromJsonOutput(const json& jsonOutput, double* parameters, std::string key) const {
     size_t p = 0;
     fromJsonOutputViaList(parameters, jsonOutput[EPOCH_TIMES_KEY], key, p);
-    RELEASE_ASSERT(m_eParams.size() == p);
+    RELEASE_ASSERT(m_eParamIdx.size() == p);
     fromJsonOutputViaList(parameters, jsonOutput[SMATRIX_VALS_KEY], key, p);
-    RELEASE_ASSERT(m_eParams.size() + m_sParams.size() == p);
+    RELEASE_ASSERT(m_eParamIdx.size() + m_sParamIdx.size() == p);
     fromJsonOutputViaList(parameters, jsonOutput[AMATRIX_PARAMS_KEY], key, p);
     RELEASE_ASSERT(totalParams() == p);
 }
