@@ -3,6 +3,7 @@ msprime
 numpy
 orjson
 pandas
+pyfaidx
 pyyaml
 tabulate
 tqdm
