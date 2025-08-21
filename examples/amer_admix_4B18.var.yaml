@@ -61,9 +61,9 @@ migration:
   - {"ground_truth": 3.11e-05, "lb": 1e-06, "ub": 0.01, "index": 4}
 epochTimeSplit:
 - {"ground_truth": 12, "lb": 5.0, "ub": 50, "index": 1}
-- {"ground_truth": 920, "lb": 500, "ub": 1400, "index": 2}
-- {"ground_truth": 2040, "lb": 1400, "ub": 3000, "index": 3}
-- {"ground_truth": 5920, "lb": 5000, "ub": 8000, "index": 4}
+- {"ground_truth": 920, "lb": 820, "ub": 1020, "index": 2}
+- {"ground_truth": 2040, "lb": 1940, "ub": 2140, "index": 3}
+- {"ground_truth": 5920, "lb": 5820, "ub": 6020, "index": 4}
 admixture:
   entries:
   - {"epoch": 3, "ancestral": "AFR", "derived": "EUR", "proportion": 1.0}

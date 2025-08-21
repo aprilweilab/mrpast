@@ -82,13 +82,13 @@ migration:
   - {"ground_truth": 2.48e-05, "lb": 1e-05, "ub": 0.01, "index": 4}
   - {"ground_truth": 0.000113, "lb": 1e-05, "ub": 0.01, "index": 5}
 epochTimeSplit:
-- {"ground_truth": 644.8275862068965, "lb": 100.0, "ub": 943.0, "index": 1}
-- {"ground_truth": 1241.3793103448277, "lb": 943.0, "ub": 1667.0, "index": 2}
-- {"ground_truth": 2093.103448275862, "lb": 1667.0, "ub": 3201.0, "index": 3}
-- {"ground_truth": 4310.3448275862065, "lb": 3201.0, "ub": 7327.0, "index": 4}
-- {"ground_truth": 10344.827586206897, "lb": 7327.0, "ub": 13775.0, "index": 5}
-- {"ground_truth": 17206.896551724138, "lb": 13775.0, "ub": 18241.0, "index": 6}
-- {"ground_truth": 19275.862068965518, "lb": 18241.0, "ub": 28396.0, "index": 7}
+- {"ground_truth": 644.8275862068965, "lb": 500.0, "ub": 800.0, "index": 1}
+- {"ground_truth": 1241.3793103448277, "lb": 1000.0, "ub": 1400.0, "index": 2}
+- {"ground_truth": 2093.103448275862, "lb": 1900.0, "ub": 2200.0, "index": 3}
+- {"ground_truth": 4310.3448275862065, "lb": 4100.0, "ub": 4500.0, "index": 4}
+- {"ground_truth": 10344.827586206897, "lb": 10000.0, "ub": 10600.0, "index": 5}
+- {"ground_truth": 17206.896551724138, "lb": 16800.0, "ub": 17500.0, "index": 6}
+- {"ground_truth": 19275.862068965518, "lb": 19000.0, "ub": 20000.0, "index": 7}
 admixture:
   entries:
   - {"epoch": 7, "ancestral": "YRI", "derived": "Neanderthal", "proportion": 1.0}
