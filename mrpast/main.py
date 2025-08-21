@@ -36,12 +36,12 @@ try:
 except ImportError:
     demes = None  # type: ignore
 
+from mrpast.polarize import polarize_vcf
 from mrpast.from_demes import convert_from_demes
 from mrpast.helpers import (
     dump_model_yaml,
     get_best_output,
     make_zarr,
-    relate_polarize,
     remove_ext,
     which,
     load_old_mrpast,
@@ -1162,12 +1162,13 @@ def main():
             result_df.to_csv(csv_file)
             print(f"Wrote DataFrame to {csv_file}")
     elif args.command == CMD_POLARIZE:
-        relate_root = os.environ.get("RELATE_ROOT")
-        assert (
-            relate_root is not None and len(relate_root) > 0
-        ), f"RELATE_ROOT not set; required for polarizing data via RELATE"
-        relate_polarize(relate_root, args.vcf_file, args.ancestral, args.out_prefix)
-        print(f"Finished polarizing. Wrote {args.out_prefix}.vcf")
+        out_file = args.out_prefix + ".vcf"
+        if os.path.exists(out_file):
+            raise RuntimeError(f"Output file {out_file} already exists")
+        with open(args.vcf_file) as fin, open(out_file, "w") as fout:
+            stats = polarize_vcf(fin, fout, args.ancestral)
+        print(f"Finished polarizing. Wrote {out_file}")
+        stats.print(sys.stdout, prefix="  ")
     elif args.command == CMD_SHOW:
         tab_show(args.solved_result, args.sort_by)
     elif args.command == CMD_SELECT:
