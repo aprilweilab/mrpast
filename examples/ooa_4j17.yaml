@@ -63,10 +63,10 @@ migration:
   - {"ground_truth": 4.75e-05, "lb": 1e-06, "ub": 0.01, "index": 4}
   - {"ground_truth": 3.3e-05, "lb": 1e-06, "ub": 0.01, "index": 5}
 epochTimeSplit:
-- {"ground_truth": 310.0, "lb": 100.0, "ub": 948.0, "index": 1}
-- {"ground_truth": 1586.0, "lb": 948.0, "ub": 2844.0, "index": 2}
-- {"ground_truth": 4103.0, "lb": 2844.0, "ub": 8206.0, "index": 3}
-- {"ground_truth": 12310.0, "lb": 8206.0, "ub": 16413.0, "index": 4}
+- {"ground_truth": 310.0, "lb": 200.0, "ub": 500.0, "index": 1}
+- {"ground_truth": 1586.0, "lb": 1300.0, "ub": 1700.0, "index": 2}
+- {"ground_truth": 4103.0, "lb": 3900.0, "ub": 4300.0, "index": 3}
+- {"ground_truth": 12310.0, "lb": 12000.0, "ub": 13000.0, "index": 4}
 populationConversion:
 - [0, 1, 2, 2]
 - [0, 1, 1, 1]

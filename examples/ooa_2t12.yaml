@@ -56,10 +56,10 @@ migration:
 # The epoch splits are required, unless there is only a single epoch. If you have 4 splits
 # then there are 5 epochs.
 epochTimeSplit:
-- {"ground_truth": 204.6, "lb": 100.0, "ub": 562.0, "index": 1}
-- {"ground_truth": 920.0, "lb": 562.0, "ub": 1480.0, "index": 2}
-- {"ground_truth": 2040.0, "lb": 1480.0, "ub": 3980.0, "index": 3}
-- {"ground_truth": 5920.0, "lb": 3980.0, "ub": 7910.0, "index": 4}
+- {"ground_truth": 204.6, "lb": 100.0, "ub": 300.0, "index": 1}
+- {"ground_truth": 920.0, "lb": 800.0, "ub": 1100.0, "index": 2}
+- {"ground_truth": 2040.0, "lb": 1900.0, "ub": 2200.0, "index": 3}
+- {"ground_truth": 5920.0, "lb": 5700.0, "ub": 6100.0, "index": 4}
 # This admixture is just a population split, since the proportion is 1.0. After a split
 # occurs (backward in time) the derived population ceases to exist and should not be
 # referenced in any of the epochs where it is "dead"
