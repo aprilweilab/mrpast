@@ -354,8 +354,8 @@ std::vector<double> getAdmixtureValues(const ParameterSchema& schema,
             admixtureValues.at(index) = 1.0 - sum;
         } else {
             admixtureValues.at(index) = paramDef.lb;
-            const double totalSum = paramDef.lb + sum;
-            penalty += (penaltyFactor * totalSum);
+            const double excess = (paramDef.lb + sum) - 1.0;
+            penalty += (penaltyFactor * excess);
         }
     }
     return std::move(admixtureValues);
