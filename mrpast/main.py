@@ -17,8 +17,9 @@ from collections import defaultdict
 from copy import deepcopy
 from enum import Enum
 from multiprocessing import Pool
-from typing import Dict, List, Tuple, Optional, Set
 from numpy.typing import NDArray
+from tabulate import tabulate
+from typing import Dict, List, Tuple, Optional, Set
 
 import argparse
 import glob
@@ -29,6 +30,7 @@ import re
 import subprocess
 import sys
 import time
+import tskit
 import uuid
 
 try:
@@ -207,6 +209,45 @@ def solve(
         with Pool(jobs) as pool:
             outputs = pool.starmap(solve_single, arguments)
     return outputs
+
+
+def get_popsummary_from_args(
+    arg_prefix,
+    leave_out_pops=[],
+) -> List[Tuple[str, int]]:
+    # Load the ARG from the tree-sequence(s) and bin the coalescence times.
+    glb = f"{arg_prefix}*.trees"
+    tree_files = list(sorted(glob.glob(glb)))
+    if not tree_files:
+        print("No tree files matched glob {glb}!", file=sys.stderr)
+        exit(1)
+    leave_out_pops = set(leave_out_pops)
+    result: List[Tuple[str, int]] = []
+    for tf in tree_files:
+        ts = tskit.load(tf)
+        pop2names = [
+            p.metadata.get("name", f"pop_{i}") for i, p in enumerate(ts.populations())
+        ]
+        pop2count = [0 for _ in pop2names]
+        for tree in ts.trees():
+            for i in ts.samples():
+                pop_id = tree.population(i)
+                if pop_id not in leave_out_pops:
+                    pop2count[pop_id] += 1
+            break
+        if not result:
+            result.extend([(n, c) for n, c in zip(pop2names, pop2count)])
+        else:
+            assert len(result) == len(
+                pop2names
+            ), f"ARG {tf} has a different number of populations from the others"
+            for i in range(len(result)):
+                assert result[i] == (
+                    pop2names[i],
+                    pop2count[i],
+                ), f"ARG {tf} has a different populations/samples from the others"
+    assert result
+    return result
 
 
 def get_coaldist_from_arg(
@@ -1038,6 +1079,27 @@ def main():
             left_skew_times=left_skew,
             seed=args.seed,
         )
+        header = ["Model Population", "ARG Population", "Haploid Samples"]
+        arg_pops = get_popsummary_from_args(
+            args.arg_prefix, leave_out_pops=args.leave_out
+        )
+        model = UserModel.from_file(args.model)
+        fail = False
+        print()
+        if len(arg_pops) != len(model.pop_names):
+            print(
+                f"ERROR: Model has {len(model.pop_names)} populatons, but ARG only has {len(arg_pops)}",
+                file=sys.stderr,
+            )
+            fail = True
+        print("Review closely: ARG population to Model population mapping")
+        print(
+            tabulate(
+                [([m] + list(a)) for a, m in zip(arg_pops, model.pop_names)],
+                headers=header,
+            )
+        )
+        assert not fail, "Failed to process ARGs"
     elif args.command == CMD_SOLVE:
         solver_outputs = solve(args.solver_inputs, args.jobs, args.timeout)
         print(f"Created outputs: {[fn for (fn, elapsed) in solver_outputs]}")

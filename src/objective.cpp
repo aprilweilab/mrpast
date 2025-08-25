@@ -228,6 +228,7 @@ void ParameterSchema::load(const json& inputData) {
         if (isJsonParamFixed(parameter)) {
             m_sFixedIdx.push_back(m_sParams.size());
         } else {
+            RELEASE_ASSERT(!isJsonParamOneMinus(parameter));
             m_sParamIdx.push_back(m_sParams.size());
             m_paramRescale.emplace_back(1.0);
         }
@@ -279,7 +280,7 @@ void ParameterSchema::initParamsViaList(double* parameters,
                                         const std::vector<size_t>& paramIdx) const {
     for (const size_t index : paramIdx) {
         const auto& parameter = paramVars.at(index);
-        RELEASE_ASSERT(index < totalParams());
+        RELEASE_ASSERT(i < totalParams());
         parameters[i] = toParam(parameter.init, i);
         i++;
     }
@@ -324,7 +325,10 @@ std::vector<double> ParameterSchema::getEpochStartTimes(double const* parameters
     return std::move(result);
 }
 
-std::vector<double> getAdmixtureValues(const ParameterSchema& schema, double const* parameters) {
+std::vector<double> getAdmixtureValues(const ParameterSchema& schema,
+                                       double const* parameters,
+                                       const double penaltyFactor,
+                                       double& penalty) {
     // Copy all of the parameter and fixed values into the admixture value vector.
     const size_t firstParamIdx = schema.m_eParamIdx.size() + schema.m_sParamIdx.size();
     const size_t numAdmixtureValues = schema.m_aParams.size();
@@ -342,14 +346,17 @@ std::vector<double> getAdmixtureValues(const ParameterSchema& schema, double con
     }
     // Populate the "one-minus" values (parameters determined by other parameters)
     for (const size_t index : schema.m_aOneMinusIdx) {
+        const BoundedVariable& paramDef = schema.m_aParams.at(index);
         double sum = 0.0;
-        for (const size_t otherIndex : schema.m_aParams.at(index).oneMinus) {
+        for (const size_t otherIndex : paramDef.oneMinus) {
             sum += admixtureValues.at(otherIndex);
         }
-        if (sum < 1.0) {
+        if (sum < (1.0 - paramDef.lb)) {
             admixtureValues.at(index) = 1.0 - sum;
         } else {
-            admixtureValues.at(index) = 0.0;
+            admixtureValues.at(index) = paramDef.lb;
+            const double excess = (paramDef.lb + sum) - 1.0;
+            penalty += (penaltyFactor * excess);
         }
     }
     return std::move(admixtureValues);
@@ -392,7 +399,8 @@ json ParameterSchema::toJsonOutput(const double* parameters, const double negLL)
 
     RELEASE_ASSERT(output.at(AMATRIX_PARAMS_KEY).size() == m_aParams.size());
     i = 0;
-    std::vector<double> admixtureValues = getAdmixtureValues(*this, parameters);
+    double ignore = 0.0;
+    std::vector<double> admixtureValues = getAdmixtureValues(*this, parameters, 0, ignore);
     for (auto& parameter : output.at(AMATRIX_PARAMS_KEY)) {
         parameter["final"] = admixtureValues.at(i);
         i++;
@@ -510,10 +518,14 @@ void verifyASMatrix(const MatrixXd& ASMatrix) {
  * Given the vector of concrete parameters values (parameters[]) and the current
  * epoch, produce the concrete admixture proportion matrix.
  */
-MatrixXd createASMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch) {
+MatrixXd createASMatrix(const ParameterSchema& schema,
+                        double const* parameters,
+                        size_t epoch,
+                        const double penaltyFactor,
+                        double& penalty) {
     assert(epoch < schema.numEpochs());
 
-    std::vector<double> admixtureValues = getAdmixtureValues(schema, parameters);
+    std::vector<double> admixtureValues = getAdmixtureValues(schema, parameters, penaltyFactor, penalty);
 
     // Now apply these values to construct the matrix, we leave off the coalescence state.
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch) - 1);
@@ -616,6 +628,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
                                   double const* parameters,
                                   const std::vector<double>& timeSlices,
                                   const std::vector<double>& epochTimes,
+                                  double& penalty,
                                   std::vector<std::pair<double, MatrixXd>>* qMatricesByTime = nullptr) {
     const size_t numEpochs = schema.numEpochs();
     assert(numEpochs > 0);
@@ -701,7 +714,7 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
             rowNorm(currentStateProbs); // Normalize each row to be a probability.
             TRACE_MATRIX(currentStateProbs, " ... normalized and converted to EOPE");
 
-            const auto ASMatrix = createASMatrix(schema, parameters, newEpoch);
+            const auto ASMatrix = createASMatrix(schema, parameters, newEpoch, ADMIXTURE_PENALTY, penalty);
             TRACE_MATRIX(ASMatrix, "ASMatrix(" << newEpoch << ")");
             currentStateMap = currentStateMap * ASMatrix;
             TRACE_MATRIX(currentStateMap, "currentStateMap(" << newEpoch << ")");
@@ -862,9 +875,11 @@ inline double computeLLForTime(Eigen::Index timeK, const MatrixXd& probabilityAt
 double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
     // One for each transition between epochs
     std::vector<double> epochTimes = m_schema.getEpochStartTimes(parameters);
+    double penalties = 0.0;
     double cost = 0.0;
     try {
-        auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
+        auto probabilityAtTime =
+            modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, penalties);
         RELEASE_ASSERT(m_cache->isSet);
         for (Eigen::Index timeK = 0; timeK < probabilityAtTime.cols(); timeK++) {
             const double ll = computeLLForTime(timeK, probabilityAtTime, m_cache->matrix);
@@ -897,13 +912,15 @@ double NegLogLikelihoodCostFunctor::operator()(double const* parameters) const {
         exit(1);
     }
 #endif
-    return cost;
+    return cost + penalties;
 }
 
 void NegLogLikelihoodCostFunctor::outputTheoreticalCoalMatrix(double const* parameters, std::ostream& out) const {
     std::vector<double> epochTimes = m_schema.getEpochStartTimes(parameters);
 
-    auto probabilityAtTime = modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes);
+    double penalties = 0.0;
+    auto probabilityAtTime =
+        modelPMFByTimeWithEpochs(m_schema, parameters, m_observed->timeSlices, epochTimes, penalties);
 
     json outputJson = m_schema.toJsonOutput(parameters, std::numeric_limits<double>::quiet_NaN());
     std::vector<std::vector<double>> matrix;

@@ -35,6 +35,14 @@ using json = nlohmann::json;
 // hugely different scale produces problems with the inverse of the Hessian.
 static constexpr double EPOCH_TIME_RESCALE = 1e-6;
 
+// We only have box constraints for the optimizer, so we need to add a smooth penalty to
+// solutions that produce bad admixture combinations (i.e., the sum of admixture exceeds
+// 1 or the bounds of the determined variable). This penalty is multiplied by the proportion
+// that we exceed 1, so e.g. 0.2 will give us a penalty of 20000. Depending on the number
+// of observations in the likelihood formulation, this may or may not be "a lot", but it
+// should always be noticeable enough to prevent these scenarios (hopefully).
+static constexpr double ADMIXTURE_PENALTY = 100000;
+
 // How we should treat the observed data (coal matrices).
 enum ObservationMode {
     OBS_MODE_UNSPECIFIED = 0,
