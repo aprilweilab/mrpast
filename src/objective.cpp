@@ -228,6 +228,7 @@ void ParameterSchema::load(const json& inputData) {
         if (isJsonParamFixed(parameter)) {
             m_sFixedIdx.push_back(m_sParams.size());
         } else {
+            RELEASE_ASSERT(!isJsonParamOneMinus(parameter));
             m_sParamIdx.push_back(m_sParams.size());
             m_paramRescale.emplace_back(1.0);
         }
@@ -279,7 +280,7 @@ void ParameterSchema::initParamsViaList(double* parameters,
                                         const std::vector<size_t>& paramIdx) const {
     for (const size_t index : paramIdx) {
         const auto& parameter = paramVars.at(index);
-        RELEASE_ASSERT(index < totalParams());
+        RELEASE_ASSERT(i < totalParams());
         parameters[i] = toParam(parameter.init, i);
         i++;
     }
