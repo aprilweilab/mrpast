@@ -1,0 +1,57 @@
+# OutOfAfrica_3G09, except with asymmetric migration rate parameters.
+ploidy: 2
+pop_count: 3
+pop_names:
+- YRI
+- CEU
+- CHB
+coalescence:
+  entries:
+  - {"epoch": 0, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 0, "deme": "CEU", "rate": {"param": 4}}
+  - {"epoch": 0, "deme": "CHB", "rate": {"param": 5}}
+  - {"epoch": 1, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "CEU", "rate": {"param": 3}}
+  - {"epoch": 2, "deme": "YRI", "rate": {"param": 2}}
+  - {"epoch": 3, "deme": "YRI", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 6.84931506849315e-05, "lb": 1.0e-06, "ub": 0.0025, "index": 1}
+  - {"ground_truth": 4.065040650406504e-05, "lb": 1.0e-06, "ub": 0.0025, "index": 2}
+  - {"ground_truth": 0.0002380952380952381, "lb": 1.0e-06, "ub": 0.0025, "index": 3}
+  - {"ground_truth": 1.682066345910231e-05, "lb": 1.0e-06, "ub": 0.0025, "index": 4}
+  - {"ground_truth": 9.243796257772543e-06, "lb": 1.0e-06, "ub": 0.0025, "index": 5}
+growth:
+  entries:
+  - {"epoch": 0, "deme": "CEU", "rate": {"param": 1}}
+  - {"epoch": 0, "deme": "CHB", "rate": {"param": 2}}
+  parameters:
+  - {"ground_truth": 0.004, "lb": 0.001, "ub": 0.05, "index": 1}
+  - {"ground_truth": 0.0055, "lb": 0.001, "ub": 0.05, "index": 2}
+migration:
+  entries:
+  - {"epoch": 0, "source": "YRI", "dest": "CEU", "rate": {"param": 2}}
+  - {"epoch": 0, "source": "CEU", "dest": "YRI", "rate": {"param": 5}}
+  - {"epoch": 0, "source": "YRI", "dest": "CHB", "rate": {"param": 3}}
+  - {"epoch": 0, "source": "CHB", "dest": "YRI", "rate": {"param": 6}}
+  - {"epoch": 0, "source": "CHB", "dest": "CEU", "rate": {"param": 4}}
+  - {"epoch": 0, "source": "CEU", "dest": "CHB", "rate": {"param": 7}}
+  - {"epoch": 1, "source": "YRI", "dest": "CEU", "rate": {"param": 1}}
+  - {"epoch": 1, "source": "CEU", "dest": "YRI", "rate": {"param": 8}}
+  parameters:
+  - {"ground_truth": 0.00025, "lb": 1.0e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 3.0e-05, "lb": 1.0e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 1.9e-05, "lb": 1.0e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 9.6e-05, "lb": 1.0e-05, "ub": 0.01, "index": 4}
+  - {"ground_truth": 3.0e-05, "lb": 1.0e-05, "ub": 0.01, "index": 5}
+  - {"ground_truth": 1.9e-05, "lb": 1.0e-05, "ub": 0.01, "index": 6}
+  - {"ground_truth": 9.6e-05, "lb": 1.0e-05, "ub": 0.01, "index": 7}
+  - {"ground_truth": 0.00025, "lb": 1.0e-05, "ub": 0.01, "index": 8}
+epochTimeSplit:
+- {"ground_truth": 848.0, "lb": 600.0, "ub": 1000.0, "index": 1}
+- {"ground_truth": 5600.0, "lb": 5400.0, "ub": 5800.0, "index": 2}
+- {"ground_truth": 8800.0, "lb": 8600.0, "ub": 9000.0, "index": 3}
+# Admixture occurs instantaneously at the beginning (backward in time) of the given epoch
+admixture:
+  entries: 
+  - {"epoch": 1, "ancestral": "CEU", "derived": "CHB", "proportion": 1}
+  - {"epoch": 2, "ancestral": "YRI", "derived": "CEU", "proportion": 1}
