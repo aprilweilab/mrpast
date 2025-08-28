@@ -212,8 +212,9 @@ def solve(
 
 
 def get_popsummary_from_args(
-    arg_prefix,
-    leave_out_pops=[],
+    arg_prefix: str,
+    leave_out_pops: List[int],
+    pop_idx_map: Dict[int, int],
 ) -> List[Tuple[str, int]]:
     # Load the ARG from the tree-sequence(s) and bin the coalescence times.
     glb = f"{arg_prefix}*.trees"
@@ -221,18 +222,23 @@ def get_popsummary_from_args(
     if not tree_files:
         print("No tree files matched glob {glb}!", file=sys.stderr)
         exit(1)
-    leave_out_pops = set(leave_out_pops)
     result: List[Tuple[str, int]] = []
     for tf in tree_files:
         ts = tskit.load(tf)
-        pop2names = [
-            p.metadata.get("name", f"pop_{i}") for i, p in enumerate(ts.populations())
-        ]
+        largest_mapped = 0
+        if pop_idx_map:
+            largest_mapped = max(pop_idx_map.values())
+        pop2names = ["N/A" for _ in range(max(ts.num_populations, largest_mapped + 1))]
+        for pop in ts.populations():
+            pop_id = pop_idx_map.get(pop.id, pop.id)
+            pop2names[pop_id] = pop.metadata.get("name", f"pop_{pop_id}")
+        assert all(map(lambda pstr: len(pstr) > 0, pop2names))
         pop2count = [0 for _ in pop2names]
         for tree in ts.trees():
             for i in ts.samples():
                 pop_id = tree.population(i)
                 if pop_id not in leave_out_pops:
+                    pop_id = pop_idx_map.get(pop_id, pop_id)
                     pop2count[pop_id] += 1
             break
         if not result:
@@ -338,6 +344,7 @@ def get_coal_counts(
     bootstrap_iters: int,
     jobs: int = 1,
     seed: int = DEFAULT_RANDOM_SEED,
+    pop_idx_map: Dict[int, int] = {},
 ) -> Tuple[List[NDArray], str, List[str]]:
     """
     Produce a list of coal matrices that will be used as part of the solver input.
@@ -376,6 +383,7 @@ def get_coal_counts(
                     group_sampler,
                     jobs=jobs,
                     seed=seed,
+                    pop_idx_map=pop_idx_map,
                 )
                 assert len(group_sampler.coal_matrices) == 1
                 coal_matrices.append(group_sampler.coal_matrices[0])
@@ -393,6 +401,7 @@ def get_coal_counts(
                 sampler,
                 jobs=jobs,
                 seed=seed,
+                pop_idx_map=pop_idx_map,
             )
             coal_matrices = list(sampler.coal_matrices)
     else:
@@ -405,6 +414,7 @@ def get_coal_counts(
             sampler,
             jobs=jobs,
             seed=seed,
+            pop_idx_map=pop_idx_map,
         )
         coal_matrices = list(sampler.coal_matrices)
     return coal_matrices, description, sampler.sample_hashes()
@@ -562,7 +572,7 @@ def process_ARGs(
     max_generation: float = DEFAULT_MAX_GENERATION,
     tree_sample_rate: int = DEFAULT_TREE_SAMPLE_RATE,
     min_time_unit: float = DEFAULT_MIN_TIME_UNIT,
-    leave_out: str = "",
+    leave_out: List[int] = [],
     group_by: Optional[str] = None,
     time_slice_str: Optional[str] = None,
     verbose: bool = False,
@@ -570,6 +580,7 @@ def process_ARGs(
     rate_map_threshold: float = 1.0,
     left_skew_times: bool = False,
     seed: int = DEFAULT_RANDOM_SEED,
+    pop_idx_map: Dict[int, int] = {},
 ) -> List[str]:
     """
     Given a set of ARGs, extract the pair-wise coalescence information and turn it into a concrete
@@ -585,7 +596,7 @@ def process_ARGs(
     coal_filenames = get_coaldist_from_arg(
         arg_prefix,
         jobs=jobs,
-        leave_out_pops=parse_intlist(leave_out),
+        leave_out_pops=leave_out,
         min_time_unit=min_time_unit,
         tree_sample_rate=tree_sample_rate,
         rate_maps=rate_maps,
@@ -635,6 +646,7 @@ def process_ARGs(
         bootstrap_iter,
         jobs=jobs,
         seed=seed,
+        pop_idx_map=pop_idx_map,
     )
     # Step 2: generate the solver input file.
     solver_input_ids, solver_input_data = generate_solver_input(
@@ -827,6 +839,12 @@ def main():
         default=1e-9,
         type=float,
         help=f"Only sample trees from regions with a recombination rate <= to this. Requires --rate-maps",
+    )
+    process_parser.add_argument(
+        "--map-pops",
+        default=None,
+        help=f"A list of <idx1>:<idx2>, comma-separated, which maps a particular population to another population, based on their "
+        "0-based indices. Useful for when the ARG populations are in a different order (or have ghosts) compared to the model.",
     )
 
     solve_parser = subparsers.add_parser(
@@ -1055,6 +1073,17 @@ def main():
             left_skew = True
         else:
             left_skew = False
+
+        pop_idx_map = {}
+        if args.map_pops is not None:
+            parts = args.map_pops.split(",")
+            for p in parts:
+                from_to = p.split(":")
+                assert len(from_to) == 2, f"Invalid --map-pops: {args.map_pops}"
+                pop_idx_map[int(from_to[0])] = int(from_to[1])
+
+        leave_out = parse_intlist(args.leave_out)
+
         process_ARGs(
             args.model,
             args.arg_prefix,
@@ -1070,7 +1099,7 @@ def main():
             max_generation=args.max_generation,
             tree_sample_rate=args.tree_sample_rate,
             min_time_unit=args.min_time_unit,
-            leave_out=args.leave_out,
+            leave_out=leave_out,
             group_by=args.group_by,
             time_slice_str=args.time_slices,
             verbose=args.verbose,
@@ -1078,10 +1107,13 @@ def main():
             rate_map_threshold=args.rate_map_threshold,
             left_skew_times=left_skew,
             seed=args.seed,
+            pop_idx_map=pop_idx_map,
         )
         header = ["Model Population", "ARG Population", "Haploid Samples"]
         arg_pops = get_popsummary_from_args(
-            args.arg_prefix, leave_out_pops=args.leave_out
+            args.arg_prefix,
+            leave_out,
+            pop_idx_map,
         )
         model = UserModel.from_file(args.model)
         fail = False

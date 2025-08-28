@@ -449,6 +449,7 @@ def process_coal_file(
     filename: str,
     time_slices: List[float],
     trees_before: int,
+    pop_idx_map: Dict[int, int],
 ):
     @lru_cache(maxsize=None)
     def discretize(timeval: float) -> int:
@@ -463,7 +464,9 @@ def process_coal_file(
             coal_list = orjson.loads(line)
             for pop_i, pop_j, t, w in coal_list:
                 pop_i = int(pop_i)
+                pop_i = pop_idx_map.get(pop_i, pop_i)
                 pop_j = int(pop_j)
+                pop_j = pop_idx_map.get(pop_j, pop_j)
                 a_b = deme_pair_to_index[pop_i, pop_j]
                 # Add a sample for a particular tree, Markov state a_b, discretized
                 # time tau, and coalescence "weight" w.
@@ -479,6 +482,7 @@ def sample_coal_matrices(
     sampler: CoalSampler,
     jobs: int = 1,
     seed: int = 42,
+    pop_idx_map: Dict[int, int] = {},
 ):
     assert len(coal_filenames) > 0
     # Produce a matrix with nstates rows and ntime_slices columns
@@ -499,7 +503,14 @@ def sample_coal_matrices(
             trees_before_list[i] = num_trees[i - 1] + trees_before_list[i - 1]
 
     args = [
-        (deepcopy(sampler), deme_pair_to_index, fn, time_slices, trees_before)
+        (
+            deepcopy(sampler),
+            deme_pair_to_index,
+            fn,
+            time_slices,
+            trees_before,
+            pop_idx_map,
+        )
         for i, (fn, trees_before) in enumerate(zip(coal_filenames, trees_before_list))
     ]
     with Pool(jobs) as p:
