@@ -5,25 +5,25 @@
 # Various populations can be used for the ADMIX deme, and the ground-truth
 # values that we use here are inferred from the PUR population. Note that
 # the ADMIX population's Ne ground truth is just Ne=10,000 because we cannot
-# infer that with MrPast when N_AMER is treated as a ghost.
+# infer that with MrPast when NAT is treated as a ghost.
 ploidy: 2
 pop_names:
 - AFR
 - EUR
 - ASIA
-- N_AMER
+- NAT
 - ADMIX
 coalescence:
   entries:
   - {"epoch": 0, "deme": "AFR", "rate": {"param": 2}}
   - {"epoch": 0, "deme": "EUR", "rate": {"param": 6}}
   - {"epoch": 0, "deme": "ASIA", "rate": {"param": 7}}
-  - {"epoch": 0, "deme": "N_AMER", "rate": {"param": 8}}
+  - {"epoch": 0, "deme": "NAT", "rate": {"param": 8}}
   - {"epoch": 0, "deme": "ADMIX", "rate": {"param": 9}}
   - {"epoch": 1, "deme": "AFR", "rate": {"param": 2}}
   - {"epoch": 1, "deme": "EUR", "rate": {"param": 6}}
   - {"epoch": 1, "deme": "ASIA", "rate": {"param": 7}}
-  - {"epoch": 1, "deme": "N_AMER", "rate": {"param": 8}}
+  - {"epoch": 1, "deme": "NAT", "rate": {"param": 8}}
   - {"epoch": 2, "deme": "AFR", "rate": {"param": 2}}
   - {"epoch": 2, "deme": "EUR", "rate": {"param": 4}}
   - {"epoch": 2, "deme": "ASIA", "rate": {"param": 5}}
@@ -89,8 +89,8 @@ admixture:
   entries: 
   - {"epoch": 1, "ancestral": "AFR", "derived": "ADMIX", "proportion": {"param": 1}}
   - {"epoch": 1, "ancestral": "EUR", "derived": "ADMIX", "proportion": {"param": 2}}
-  - {"epoch": 1, "ancestral": "N_AMER", "derived": "ADMIX", "proportion": {"param": 3}}
-  - {"epoch": 2, "ancestral": "ASIA", "derived": "N_AMER", "proportion": 1}
+  - {"epoch": 1, "ancestral": "NAT", "derived": "ADMIX", "proportion": {"param": 3}}
+  - {"epoch": 2, "ancestral": "ASIA", "derived": "NAT", "proportion": 1}
   - {"epoch": 3, "ancestral": "EUR", "derived": "ASIA", "proportion": 1}
   - {"epoch": 4, "ancestral": "AFR", "derived": "EUR", "proportion": 1}
   parameters:

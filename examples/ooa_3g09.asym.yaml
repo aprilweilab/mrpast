@@ -38,14 +38,14 @@ migration:
   - {"epoch": 1, "source": "YRI", "dest": "CEU", "rate": {"param": 1}}
   - {"epoch": 1, "source": "CEU", "dest": "YRI", "rate": {"param": 8}}
   parameters:
-  - {"ground_truth": 0.00025, "lb": 1.0e-05, "ub": 0.01, "index": 1}
-  - {"ground_truth": 3.0e-05, "lb": 1.0e-05, "ub": 0.01, "index": 2}
-  - {"ground_truth": 1.9e-05, "lb": 1.0e-05, "ub": 0.01, "index": 3}
-  - {"ground_truth": 9.6e-05, "lb": 1.0e-05, "ub": 0.01, "index": 4}
-  - {"ground_truth": 3.0e-05, "lb": 1.0e-05, "ub": 0.01, "index": 5}
-  - {"ground_truth": 1.9e-05, "lb": 1.0e-05, "ub": 0.01, "index": 6}
-  - {"ground_truth": 9.6e-05, "lb": 1.0e-05, "ub": 0.01, "index": 7}
-  - {"ground_truth": 0.00025, "lb": 1.0e-05, "ub": 0.01, "index": 8}
+  - {"ground_truth": 0.000162517, "lb": 1.0e-06, "ub": 0.01, "index": 1}
+  - {"ground_truth": 2.48533e-05, "lb": 1.0e-06, "ub": 0.01, "index": 2}
+  - {"ground_truth": 3.69943e-05, "lb": 1.0e-06, "ub": 0.01, "index": 3}
+  - {"ground_truth": 1.0e-05, "lb": 1.0e-06, "ub": 0.01, "index": 4}
+  - {"ground_truth": 9.88089e-05, "lb": 1.0e-06, "ub": 0.01, "index": 5}
+  - {"ground_truth": 1.0e-05, "lb": 1.0e-06, "ub": 0.01, "index": 6}
+  - {"ground_truth": 0.000194507, "lb": 1.0e-06, "ub": 0.01, "index": 7}
+  - {"ground_truth": 0.000327296, "lb": 1.0e-06, "ub": 0.01, "index": 8}
 epochTimeSplit:
 - {"ground_truth": 848.0, "lb": 600.0, "ub": 1000.0, "index": 1}
 - {"ground_truth": 5600.0, "lb": 5400.0, "ub": 5800.0, "index": 2}
