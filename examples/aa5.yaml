@@ -1,0 +1,99 @@
+# A 5-deme model that combines the 3-deme out-of-Africa model with a native
+# american population and a final admixed population. Based on parameters
+# from OutOfAfrica_3G09 (and mrpast's confirmation of these parameter values).
+# 
+# Various populations can be used for the ADMIX deme, and the ground-truth
+# values that we use here are inferred from the PUR population. Note that
+# the ADMIX population's Ne ground truth is just Ne=10,000 because we cannot
+# infer that with MrPast when NAT is treated as a ghost.
+ploidy: 2
+pop_names:
+- AFR
+- EUR
+- ASIA
+- NAT
+- ADMIX
+coalescence:
+  entries:
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 0, "deme": "EUR", "rate": {"param": 6}}
+  - {"epoch": 0, "deme": "ASIA", "rate": {"param": 7}}
+  - {"epoch": 0, "deme": "NAT", "rate": {"param": 8}}
+  - {"epoch": 0, "deme": "ADMIX", "rate": {"param": 9}}
+  - {"epoch": 1, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "EUR", "rate": {"param": 6}}
+  - {"epoch": 1, "deme": "ASIA", "rate": {"param": 7}}
+  - {"epoch": 1, "deme": "NAT", "rate": {"param": 8}}
+  - {"epoch": 2, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "deme": "EUR", "rate": {"param": 4}}
+  - {"epoch": 2, "deme": "ASIA", "rate": {"param": 5}}
+  - {"epoch": 3, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 3, "deme": "EUR", "rate": {"param": 3}}
+  - {"epoch": 4, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 5, "deme": "AFR", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 6.84931506849315e-05, "lb": 5.0e-06, "ub": 0.0025, "index": 1}
+  - {"ground_truth": 4.065040650406504e-05, "lb": 5.0e-06, "ub": 0.0025, "index": 2}
+  - {"ground_truth": 0.0002380952380952381, "lb": 5.0e-06, "ub": 0.0025, "index": 3}
+  - {"ground_truth": 0.000215857756459556, "lb": 1.0e-06, "ub": 0.01, "index": 4}
+  - {"ground_truth": 0.00030888182875505216, "lb": 1.0e-06, "ub": 0.01, "index": 5}
+  - {"ground_truth": 1.682066345910231e-05, "lb": 5.0e-06, "ub": 0.0025, "index": 6}
+  - {"ground_truth": 9.243796257772543e-06, "lb": 5.0e-06, "ub": 0.0025, "index": 7}
+  - {"ground_truth": 0.00047, "lb": 5.0e-06, "ub": 0.0025, "index": 8}
+  - {"ground_truth": 5.0e-05, "lb": 5.0e-06, "ub": 0.0025, "index": 9}
+growth:
+  entries:
+  # We model the growth as occurring only in the 2nd most recent epoch (which is the largest
+  # of the recent epochs), to simplify the modeling here, because we have to add a new Ne parameter
+  # for each epoch that a growth rate spans.
+  - {"epoch": 1, "deme": "EUR", "rate": {"param": 1}}
+  - {"epoch": 1, "deme": "ASIA", "rate": {"param": 2}}
+  parameters:
+  - {"ground_truth": 0.004, "lb": 0.001, "ub": 0.05, "index": 1}
+  - {"ground_truth": 0.0055, "lb": 0.001, "ub": 0.05, "index": 2}
+migration:
+  entries:
+  - {"epoch": 0, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 0, "source": "AFR", "dest": "ASIA", "rate": {"param": 3}}
+  - {"epoch": 0, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 0, "source": "EUR", "dest": "ASIA", "rate": {"param": 4}}
+  - {"epoch": 0, "source": "ASIA", "dest": "AFR", "rate": {"param": 3}}
+  - {"epoch": 0, "source": "ASIA", "dest": "EUR", "rate": {"param": 4}}
+  - {"epoch": 1, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "AFR", "dest": "ASIA", "rate": {"param": 3}}
+  - {"epoch": 1, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "source": "EUR", "dest": "ASIA", "rate": {"param": 4}}
+  - {"epoch": 1, "source": "ASIA", "dest": "AFR", "rate": {"param": 3}}
+  - {"epoch": 1, "source": "ASIA", "dest": "EUR", "rate": {"param": 4}}
+  - {"epoch": 2, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+  - {"epoch": 2, "source": "AFR", "dest": "ASIA", "rate": {"param": 3}}
+  - {"epoch": 2, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "source": "EUR", "dest": "ASIA", "rate": {"param": 4}}
+  - {"epoch": 2, "source": "ASIA", "dest": "AFR", "rate": {"param": 3}}
+  - {"epoch": 2, "source": "ASIA", "dest": "EUR", "rate": {"param": 4}}
+  - {"epoch": 3, "source": "AFR", "dest": "EUR", "rate": {"param": 1}}
+  - {"epoch": 3, "source": "EUR", "dest": "AFR", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 0.00025, "lb": 1.0e-05, "ub": 0.01, "index": 1}
+  - {"ground_truth": 3.0e-05, "lb": 1.0e-05, "ub": 0.01, "index": 2}
+  - {"ground_truth": 1.9e-05, "lb": 1.0e-05, "ub": 0.01, "index": 3}
+  - {"ground_truth": 9.6e-05, "lb": 1.0e-05, "ub": 0.01, "index": 4}
+epochTimeSplit:
+- {"ground_truth": 12.0, "lb": 5.0, "ub": 50.0, "index": 1}
+- {"ground_truth": 650.0, "lb": 500.0, "ub": 800.0, "index": 2}
+- {"ground_truth": 848.0, "lb": 800.0, "ub": 1000.0, "index": 3}
+- {"ground_truth": 5600.0, "lb": 5400.0, "ub": 5800.0, "index": 4}
+- {"ground_truth": 8800.0, "lb": 8600.0, "ub": 9000.0, "index": 5}
+# Admixture occurs instantaneously at the beginning (backward in time) of the given epoch
+admixture:
+  entries: 
+  - {"epoch": 1, "ancestral": "AFR", "derived": "ADMIX", "proportion": {"param": 1}}
+  - {"epoch": 1, "ancestral": "EUR", "derived": "ADMIX", "proportion": {"param": 2}}
+  - {"epoch": 1, "ancestral": "NAT", "derived": "ADMIX", "proportion": {"param": 3}}
+  - {"epoch": 2, "ancestral": "ASIA", "derived": "NAT", "proportion": 1}
+  - {"epoch": 3, "ancestral": "EUR", "derived": "ASIA", "proportion": 1}
+  - {"epoch": 4, "ancestral": "AFR", "derived": "EUR", "proportion": 1}
+  parameters:
+  - {"ground_truth": 0.104687, "lb": 0.05, "ub": 0.80, "index": 1}
+  - {"ground_truth": 0.776327, "lb": 0.05, "ub": 0.80, "index": 2}
+  - {"ground_truth": 0.118986, "lb": 0.05, "ub": 0.80, "index": 3}
