@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 from tabulate import tabulate
-from typing import Optional, Dict, Any, List, Iterable
+from typing import Optional, Dict, Any, List, Iterable, Tuple
 import itertools
 import json
 import math
@@ -242,6 +242,7 @@ def summarize_bootstrap_data(
         if ci_mult is None:
             c95_low = value - min(values)
             c95_hi = max(values) - value
+            std_err = None
         else:
             # numpy defaults to population stddev, so set degrees of freedom to 1
             std_err = np.std(values, ddof=1)
@@ -259,6 +260,8 @@ def summarize_bootstrap_data(
                 "err_hi": c95_hi,
                 "min": min(values),
                 "max": max(values),
+                "std": std_err,
+                "Epochs": get_singular(bootstrap_df, label, "Epochs"),
                 "covered": (truth >= (value - c95_low) and truth <= (value + c95_hi)),
                 "param_index": get_singular(bootstrap_df, label, "Unnamed: 0"),
             }
@@ -280,6 +283,7 @@ def draw_graphs(
     mig_values: Optional[List[float]] = None,
     cax=None,
     cmap=None,
+    min_max_migrate: Optional[Tuple[float, float]] = None,
 ):
     """
     Draw the topology of the given input mrpast model file on the given matplotlib axis.
@@ -303,6 +307,8 @@ def draw_graphs(
     :param mig_values: If non-None, use this list of migration rate values instead of the
         ground-truth values from the model. This only works if the model has densely packed
         parameters, with no parameter index gaps.
+    :param min_max_migrate: Optional tuple of (min, max) float values, which are the minimum
+        and maximum possible migration rate values for the purposes of coloring the edges.
     """
     assert (
         nx is not None and plt is not None
@@ -328,17 +334,24 @@ def draw_graphs(
             return mig_values[mig_param_idx - 1]
         return model.migration.get_parameter(mig_param_idx).ground_truth
 
+    # Use the average of the ground truth values as our normalizing factor.
     avg_mig = 0.0
     for p in model.migration.parameters:
         avg_mig += p.ground_truth
     avg_mig /= len(model.migration.parameters)
 
+    def norm_mig(mr):
+        return math.log10(mr / avg_mig)
+
     max_popsize = 0
     for entry in model.coalescence.entries:
         if isinstance(entry.rate, mrpast.model.ParamRef):
-            pop_size = 1 / (model.ploidy * get_coal_value(entry.rate.param))
-            if pop_size > max_popsize:
-                max_popsize = pop_size
+            cr = get_coal_value(entry.rate.param)
+        else:
+            cr = entry.rate
+        pop_size = 1 / (model.ploidy * cr)
+        if pop_size > max_popsize:
+            max_popsize = pop_size
 
     for epoch in reversed(range(model.num_epochs)):
         pop_sizes = [0 for _ in range(model.num_demes)]
@@ -346,7 +359,10 @@ def draw_graphs(
             entry = model.coalescence.get_entry(epoch, i)
             if entry is not None:
                 if isinstance(entry.rate, mrpast.model.ParamRef):
-                    pop_sizes[i] = 1 / (model.ploidy * get_coal_value(entry.rate.param))
+                    cr = get_coal_value(entry.rate.param)
+                else:
+                    cr = entry.rate
+                pop_sizes[i] = 1 / (model.ploidy * cr)
 
         nodes = [i for i in range(model.num_demes) if pop_sizes[i] > 0]
         node_sizes.extend(
@@ -360,12 +376,14 @@ def draw_graphs(
                 entry = model.migration.get_entry(epoch, i, j)
                 if entry is not None:
                     if isinstance(entry.rate, mrpast.model.ParamRef):
-                        w = math.log10(get_mig_value(entry.rate.param) / avg_mig)
-                        G.add_edge(
-                            base_node_id + i,
-                            base_node_id + j,
-                            weight=w,
-                        )
+                        w = norm_mig(get_mig_value(entry.rate.param))
+                    else:
+                        w = norm_mig(entry.rate)
+                    G.add_edge(
+                        base_node_id + i,
+                        base_node_id + j,
+                        weight=w,
+                    )
 
         if grid_cols is not None:
             if pos is None:
@@ -384,6 +402,10 @@ def draw_graphs(
         base_node_id += model.num_demes
 
     weights = [G[u][v]["weight"] for u, v in G.edges()]
+    min_edge_color = (
+        norm_mig(min_max_migrate[0]) if min_max_migrate else min(weights)
+    ) * 1.25
+    max_edge_color = norm_mig(min_max_migrate[1]) if min_max_migrate else max(weights)
     if popsize_color is None:
         node_options = {
             "node_size": node_sizes,
@@ -401,9 +423,8 @@ def draw_graphs(
         edge_options = {
             "edge_color": weights,
             "width": 2,
-            "edge_vmin": min(weights)
-            * 1.25,  # These are log scale, so this makes a smaller (more negative) value
-            "edge_vmax": max(weights),
+            "edge_vmin": min_edge_color,
+            "edge_vmax": max_edge_color,
             "edge_cmap": cmap,
             "connectionstyle": "arc3,rad=0.1",
         }
@@ -413,14 +434,14 @@ def draw_graphs(
             "width": 2,
             "connectionstyle": "arc3,rad=0.1",
         }
-    print(f"Node sizes: {node_sizes}")
-    print(f"Edge weights: {weights}")
+    # print(f"Node sizes: {node_sizes}")
+    # print(f"Edge weights: {weights}")
     nx.draw_networkx_nodes(G, pos=pos, **node_options, ax=ax)
     nx.draw_networkx_edges(G, pos=pos, **edge_options, ax=ax)
     ax.axis("off")
 
     # Colorbar "legend"
-    norm_weights = mpl.colors.Normalize(vmin=min(weights), vmax=max(weights))
+    norm_weights = mpl.colors.Normalize(vmin=min_edge_color, vmax=max_edge_color)
     if cax is not None:
         plt.colorbar(
             plt.cm.ScalarMappable(cmap=cmap, norm=norm_weights),

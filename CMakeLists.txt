@@ -4,6 +4,7 @@ include(CheckCXXCompilerFlag)
 
 option(ENABLE_TESTS "Enable automated test execution" ON)
 option(ENABLE_NATIVE "Enable the compiler to use architecture-specific functionality; speeds up numerical computations but makes the resulting binaries less portable" OFF)
+option(TRACE_MATRICES "Enable verbose output showing matrix values; debuging feature" OFF)
 
 # By default we use static libraries, which makes Python packaging easier.
 option(BUILD_SHARED_LIBS "Build using shared libraries" OFF)
@@ -30,6 +31,10 @@ if(${ENABLE_NATIVE})
   if(${COMPILER_SUPPORTS_FMA})
     add_compile_options(-mfma)
   endif()
+endif()
+
+if(${TRACE_MATRICES})
+  add_compile_options(-DTRACE_MATRICES=1)
 endif()
 
 set(MRPAST_CORE_SOURCES

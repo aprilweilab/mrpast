@@ -36,9 +36,6 @@ using json = nlohmann::json;
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
-// Turn this on and recompile, to track down numerical problems.
-#define TRACE_MATRICES 0
-
 // When computing probabilities in multi-epoch models, this uses the additive probability rule
 // P(A or B) = P(A) + P(B) - P(A and B), instead of negating all of the probabilities to only
 // use P(not(A) and not(B)). The former results in fewer subtractions, which anecdotally appears
@@ -64,7 +61,7 @@ using Eigen::VectorXd;
     } while (0)
 
 #if TRACE_MATRICES
-#define TRACE_MATRIX(m, desc) DUMP_MATRIX
+#define TRACE_MATRIX(m, desc) DUMP_MATRIX(m, desc)
 #define TRACELN(msg)          std::cerr << msg << std::endl;
 #else
 #define TRACE_MATRIX(m, desc)

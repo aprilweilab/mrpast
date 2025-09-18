@@ -43,7 +43,6 @@ using json = nlohmann::json;
 // more numerically stable than taking the inverse of J and GIM.
 #define SINGLE_INVERSE_CALCULATION 1
 
-#define TRACE_MATRICES 0
 #if TRACE_MATRICES
 #define TRACE_MATRIX(m, desc)                                                                                          \
     do {                                                                                                               \
