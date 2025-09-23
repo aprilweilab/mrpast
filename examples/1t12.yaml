@@ -1,0 +1,21 @@
+ploidy: 2
+pop_count: 1
+pop_names:
+- AFR
+coalescence:
+  entries:
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 3}}
+  - {"epoch": 1, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 2, "deme": "AFR", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 6.839945280437756e-05, "lb": 6.839945280437756e-06, "ub": 0.0006839945280437756, "index": 1}
+  - {"ground_truth": 3.45447008428907e-05, "lb": 3.45447008428907e-06, "ub": 0.000345447008428907, "index": 2}
+  - {"ground_truth": 1.1570737191765288e-06, "lb": 1.1570737191765288e-07, "ub": 1.1570737191765288e-05, "index": 3}
+growth:
+  entries:
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 0.0166, "lb": 0.01, "ub": 0.025, "index": 1}
+epochTimeSplit:
+- {"ground_truth": 204.6, "lb": 100.0, "ub": 400.0, "index": 1}
+- {"ground_truth": 5920.0, "lb": 3062.0, "ub": 7451.0, "index": 2}

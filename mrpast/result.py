@@ -274,7 +274,7 @@ def draw_graphs(
     ax,
     grid_cols: Optional[int] = None,
     epoch_spacing: float = 0.5,
-    epoch_label_spacing: float = 0.15,
+    epoch_label_spacing: Optional[float] = 0.15,
     max_node_size: int = 800,
     migrate_color: Optional[str] = None,
     popsize_color: Optional[str] = None,
@@ -294,7 +294,8 @@ def draw_graphs(
         with the given number of columns. For example, if you have a 6-deme model then you
         might want to set grid_cols=2 or grid_cols=3 to lay the graph out as 3x2 or 2x3.
     :param epoch_spacing: Spacing between each epoch in the figure.
-    :param epoch_label_spacing: Spacing between the epoch label and the epoch graph.
+    :param epoch_label_spacing: Spacing between the epoch label and the epoch graph. Set to
+        None to disable epoch labels.
     :param max_node_size: The maximum size that a particular node can be.
     :param migrate_color: The color to use for migration edges. By default, a spectrum of
         colors is used which indicates a higher (darker color) or lower (lighter color) rate.
@@ -395,7 +396,8 @@ def draw_graphs(
                     for i, node in enumerate(nodes)
                 }
             )
-            ax.text(x_offset, y_offset + epoch_label_spacing, f"Epoch {epoch}")
+            if epoch_label_spacing is not None:
+                ax.text(x_offset, y_offset + epoch_label_spacing, f"Epoch {epoch}")
             y_offset -= (len(nodes) // grid_cols) + epoch_spacing
         else:
             pos = None
