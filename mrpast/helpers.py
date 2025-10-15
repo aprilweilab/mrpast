@@ -60,8 +60,7 @@ def which(exe: str, required=False) -> Optional[str]:
     except subprocess.CalledProcessError:
         result = None
     if result is None:
-        sys_paths = [os.path.join(p, "mrpast") for p in sys.path]
-        for p in sys_paths + [os.path.realpath(os.path.dirname(__file__))]:
+        for p in sys.path + [os.path.realpath(os.path.dirname(__file__))]:
             p = os.path.join(p, exe)
             if os.path.isfile(p):
                 result = p

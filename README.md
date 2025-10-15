@@ -6,11 +6,16 @@ Infer demographic parameters from Ancestral Recombination Graphs (ARGs).
 
 ## Install
 
-_Not yet published to PyPi_.
+Python 3.8 or newer is supported.
+
+Install from PyPi:
+```
+pip install mrpast
+```
+
+On Linux, this will use prebuilt binaries. On MacOS, this will trigger a source code build, which requires CMake and gcc or clang (C++17 support required).
 
 ## Build/Install from repository
-
-Requires Python 3.9 or newer, CMake, and a version of gcc or clang that supports C++17.
 
 Recommend using a virtual environment, the below creates and activates one:
 ```
@@ -26,7 +31,7 @@ pip install mrpast/
 
 ### Alternative installation options
 
-1. Compile for the native CPU; this can drastically speed up the numerical solver, but makes the resulting package less portable.
+1. Compile for the native CPU; this can speed up the numerical solver, but makes the resulting package less portable.
 ```
 MRPAST_ENABLE_NATIVE=1 pip install mrpast/ 
 ```
@@ -51,6 +56,8 @@ The documentation is still not updated w/r/t the new model format, but hopefully
 explain the changes.
 
 ## Usage
+
+See [the documentation](https://mrpast.readthedocs.io/en/latest/) for examples and details.
 
 There are three primary subcommands to `mrpast`, and they are usually run in this order:
 1. `mrpast simulate`
