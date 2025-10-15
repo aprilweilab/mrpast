@@ -11,4 +11,4 @@ mypy mrpast --no-namespace-packages --ignore-missing-imports
 
 pytest test/
 
-./py_build/mrpast_test
+./build/mrpast_test

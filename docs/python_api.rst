@@ -4,7 +4,7 @@ Python API
 ==========
 
 .. automodule:: mrpast.result
-    :members: load_json_pandas, summarize_bootstrap_data, draw_graphs
+    :members: load_json_pandas, summarize_bootstrap_data, draw_graphs, tab_show
 
 .. automodule:: mrpast.arginfer
     :members: attach_populations_ts

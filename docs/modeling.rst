@@ -50,7 +50,7 @@ from the lengths of these lists and matrices. We use :math:`D` to refer to the n
 
 ::
 
-  # Informational only: the names of population0 and population1, respectively.
+  # The names of population0 and population1, respectively.
   pop_names:
   - AFR
   - EUR
@@ -59,91 +59,42 @@ For each population, we need an effective population size. In mrpast this is mod
 is just :math:`\frac{1}{ploidy \times N_e}` where `N_e` is the effective population size. At the heart of mrpast
 models is a "parameter", which just a 1-based index associated with a bounded unknown value. Parameters can have
 ground truth associated with them, for the purposes of simulation and quantifying error rates. The coalescence
-rates are made up of two components: a list of vectors of parameter indexes, and a list of parameters. Each parameter
-has an ``index:`` field that specifies the unique, non-zero index it uses. A zero value indicates no parameter. For
-coalescence rates, no parameter is only valid when that population is inactive (e.g., it hasn't been created yet).
+rates are made up of two components: a list of coalesence rate definitions, and a list of parameters. Each parameter
+has an ``index:`` field that specifies the unique, non-zero index it uses.
 
 ::
 
-  # The coalescence rate parameterization.
+  # The coalescence rate parameterization, which is REQUIRED.
   coalescence:
-    # Each vector corresponds to an epoch, and we must have exactly one vector per epoch. Here
-    # we have 5 epochs and 2 demes (populations).
-    # Parameters are indexed 1-based.
-    vectors:
-    - [3, 6]  # Parameter 3 defines the coalescent rate of population0, and param 6 similarly is for population1, in epoch0
-    - [2, 5]
-    - [2, 4]
-    - [2, 0]  # Here, in epoch3, there is no coalescent rate parameter for population1. This is because that population is inactive (not yet created)
-    - [1, 0]
+    # Demes can be referenced by number (0, 1) or name (AFR, EUR). Rate values can be either
+    # constants (just a float value) or a parameter reference of the form {"param": <index>}
+    entries:
+    - {"epoch": 0, "deme": "AFR", "rate": {"param": 3}}
+    - {"epoch": 0, "deme": "EUR", "rate": {"param": 6}}
+    - {"epoch": 1, "deme": "AFR", "rate": {"param": 2}}
+    - {"epoch": 1, "deme": "EUR", "rate": {"param": 5}}
+    - {"epoch": 2, "deme": "AFR", "rate": {"param": 2}}
+    - {"epoch": 2, "deme": "EUR", "rate": {"param": 4}}
+    - {"epoch": 3, "deme": "AFR", "rate": {"param": 2}}
+    - {"epoch": 4, "deme": "AFR", "rate": {"param": 1}}
 
 The corresponding parameters are next, and are nested within the ``coalescence`` object. Each object (``coalescence``,
 ``migration``, ``growth``) has its own parameter space within which indexes must be unique.
 
 ::
 
-  parameters:
-    # The ground-truth is used for simulation and for comparing results.
-    - ground_truth: 6.839945280437756e-05
-      # The lower and upper bound are to restrict the search space when solving maximum likelihood.
-      lb: 1.0e-07
-      ub: 0.01
-      # The index here is how we can refer to this parameter in the coalescence vectors. If we put a "1" in the coalescence
-      # vectors above, we are referring to this parameter.
-      index: 1
-    - ground_truth: 3.45447008428907e-05
-      lb: 1.0e-07
-      ub: 0.01
-      index: 2
-    - ground_truth: 1.1570737191765288e-06
-      lb: 1.0e-07
-      ub: 0.01
-      index: 3
-    - ground_truth: 0.00026867275658248256
-      lb: 1.0e-07
-      ub: 0.01
-      index: 4
-    - ground_truth: 5.388388380070718e-05
-      lb: 1.0e-07
-      ub: 0.01
-      index: 5
-    - ground_truth: 9.971355417745619e-07
-      lb: 1.0e-07
-      ub: 0.01
-      index: 6
-
-Next we have the ``migration`` section which follows a similar parameterization, except that each epoch is described
-by a :math:`D \times D` matrix instead of a :math:`D`-length vector. Here, a 0 (no parameter) means there is no possible
-migration between the two populations in the given epoch.
-
-::
-
-  migration:
-    # Since migration rate is between a pair of populations, we have a single matrix per epoch instead of just a vector.
-    matrices:
-    # This first matrix is [ [0, 2], [2, 0] ]. The "2" values refer to the parameter with "index: 2" below. Parameters are
-    # scoped only within their particular parameterization, so "2" under "migration:" is different from "2" under "coalescence:".
-    - - [0, 2]
-      - [2, 0] # The 0s on the diagonal are because migration between a population and itself does not make sense.
-    - - [0, 2]
-      - [2, 0]
-    - - [0, 1]
-      - [1, 0]
-    - - [0, 0] # These last two epochs have no migration at all.
-      - [0, 0]
-    - - [0, 0]
-      - [0, 0]
+    # These indexes specified by these parameters matches up with the parameter references above.
     parameters:
-    - ground_truth: 0.00015
-      lb: 1.0e-05
-      ub: 0.01
-      index: 1
-    - ground_truth: 2.5e-05
-      lb: 1.0e-05
-      ub: 0.01
-      index: 2
+    - {"ground_truth": 6.839945280437756e-05, "lb": 1e-07, "ub": 0.01, "index": 1}
+    - {"ground_truth": 3.45447008428907e-05, "lb": 1e-07, "ub": 0.01, "index": 2}
+    - {"ground_truth": 1.1570737191765288e-06, "lb": 1e-07, "ub": 0.01, "index": 3}
+    - {"ground_truth": 0.00026867275658248256, "lb": 1e-07, "ub": 0.01, "index": 4}
+    - {"ground_truth": 5.388388380070718e-05, "lb": 1e-07, "ub": 0.01, "index": 5}
+    - {"ground_truth": 9.971355417745619e-07, "lb": 1e-07, "ub": 0.01, "index": 6}
 
-Next, an optional ``growth`` section, defining the rate at which each population grows. The growth rate is applies
+So above, e.g., the ``{"param": 3}`` matches up with the ``{..., "index": 3}``, etc.
+
+Next, an optional ``growth`` section, defining the rate at which each population grows. The growth rate is applied
 backwards in time: the coalescence rate :math:`C(i)` given in the first section defines an effective population size :math:`N_e(i)`,
 which is the population size for population :math:`i` at the *start* (nearest to current time) of the particular epoch.
 The population size through-out the epoch (and at it's end, furthest away from current time) is defined as
@@ -152,72 +103,64 @@ number of generations backwards in time.
 
 ::
 
-  # Growth rate parameterization for populations.
+  # Growth rates are optional.
   growth:
-    vectors:
-    - [1, 3]  # Epoch0: Both population0 and population1 are growing
-    - [0, 2]  # Epoch1: Only population1 is growing
-    - [0, 0]  # Epoch2: No growth
-    - [0, 0]  # Epoch3: No growth
-    - [0, 0]  # Epoch4: No growth
+    entries:
+    - {"epoch": 0, "deme": "AFR", "rate": {"param": 1}}
+    - {"epoch": 0, "deme": "EUR", "rate": {"param": 3}}
+    - {"epoch": 1, "deme": "EUR", "rate": {"param": 2}}
     parameters:
-    - ground_truth: 0.0166
-      lb: 0.001
-      ub: 0.05
-      index: 1
-    - ground_truth: 0.0030700000000000002
-      lb: 0.001
-      ub: 0.05
-      index: 2
-    - ground_truth: 0.0195
-      lb: 0.001
-      ub: 0.05
-      index: 3
+    - {"ground_truth": 0.0166, "lb": 0.001, "ub": 0.05, "index": 1}
+    - {"ground_truth": 0.0030700000000000002, "lb": 0.001, "ub": 0.05, "index": 2}
+    - {"ground_truth": 0.0195, "lb": 0.001, "ub": 0.05, "index": 3}
 
 
-Our final set of parameters is for the times between each epoch. mrpast does not support fixed epoch times per-se, they
-are always bounded parameters. If you need "fixed" epoch times, just set the bounds to be very tight.
+Next we have the (optional) ``migration`` section which follows a similar parameterization, except that there are two demes
+(source and destination) in the definition.
 
 ::
 
-  # The parameters for the transition time between each epoch. There are 5 epochs, so we need 4 of
-  # these parameters (for each "in between")
+  # Migration rates are optional.
+  migration:
+    # The source/dest are with respect to BACKWARDS IN TIME. Everything in MrPast models is
+    # backwards in time. So "source" is where lineages are migrating _from_ backwards in time
+    # and where lineages are migrating _to_ forwards in time.
+    entries:
+    - {"epoch": 0, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+    - {"epoch": 0, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+    - {"epoch": 1, "source": "AFR", "dest": "EUR", "rate": {"param": 2}}
+    - {"epoch": 1, "source": "EUR", "dest": "AFR", "rate": {"param": 2}}
+    - {"epoch": 2, "source": "AFR", "dest": "EUR", "rate": {"param": 1}}
+    - {"epoch": 2, "source": "EUR", "dest": "AFR", "rate": {"param": 1}}
+    parameters:
+    - {"ground_truth": 0.00015, "lb": 1e-05, "ub": 0.01, "index": 1}
+    - {"ground_truth": 2.5e-05, "lb": 1e-05, "ub": 0.01, "index": 2}
+
+Next have the times between each epoch. These can be fixed to a specific value by setting the lower
+bound, upper bound, and ground truth all to the same value. 
+
+::
+
+  # The epoch splits are required, unless there is only a single epoch. If you have 4 splits
+  # then there are 5 epochs.
   epochTimeSplit:
-  # Split between epoch0 -> epoch1
-  - ground_truth: 204.6
-    lb: 100.0
-    ub: 562.0
-    index: 1
-  # Split between epoch1 -> epoch2
-  - ground_truth: 920.0
-    lb: 562.0
-    ub: 1480.0
-    index: 2
-  # Split between epoch2 -> epoch3
-  - ground_truth: 2040.0
-    lb: 1480.0
-    ub: 3980.0
-    index: 3
-  # Split between epoch3 -> epoch4
-  - ground_truth: 5920.0
-    lb: 3980.0
-    ub: 7910.0
-    index: 4
+  - {"ground_truth": 204.6, "lb": 100.0, "ub": 300.0, "index": 1}
+  - {"ground_truth": 920.0, "lb": 800.0, "ub": 1100.0, "index": 2}
+  - {"ground_truth": 2040.0, "lb": 1900.0, "ub": 2200.0, "index": 3}
+  - {"ground_truth": 5920.0, "lb": 5700.0, "ub": 6100.0, "index": 4}
 
 
 Lastly, we define the conversion relationship between populations. Forwards in time you can think of this as populations
 starting by splitting off from another population. Backwards in time this can be thought of as populations merging into
-one. The values are 0-based, so :math:`0` is the first population and :math:`D-1` is the last population. If you want no
-splits or merges in your model, each vector should just be :math:`0, 1, ..., D-1`.
+one. This is called "admixture", though you can define a split (just copy from one population to another)
+by setting the proportion to be ``1.0``, as we do below. See the ``aa5.yaml`` example model
+for demonstration on how to parameterize admixture when the proportions are not ``1.0``.
 
 ::
 
-  # How the populations map to each other in between epochs. When the position and the number in it match, there
-  # is no splitting of the population. This is viewed backwards in time as a merge of the populations, so if we
-  # have v[i] = j, then backwards in time population i merges into population j in between the relevant epochs.
-  populationConversion:
-  - [0, 1]  # epoch0 -> epoch1: v[0] == 0 and v[1] == 1, so there are no splits
-  - [0, 1]  # epoch1 -> epoch2: v[0] == 0 and v[1] == 1, so there are no splits
-  - [0, 0]  # epoch2 -> epoch3: v[0] == 0, but v[1] == 0, so here we have population1 splitting off from population0 at the start of epoch2 / end of epoch3
-  - [0, 0]  # epoch3 -> epoch4: no change from the previous scenario, so there are no new splits
-
+  # This admixture is just a population split, since the proportion is 1.0. After a split
+  # occurs (backward in time) the derived population ceases to exist and should not be
+  # referenced in any of the epochs where it is "dead"
+  admixture:
+    entries:
+    - {"epoch": 3, "ancestral": "AFR", "derived": "EUR", "proportion": 1.0}

@@ -60,8 +60,7 @@ def which(exe: str, required=False) -> Optional[str]:
     except subprocess.CalledProcessError:
         result = None
     if result is None:
-        sys_paths = [os.path.join(p, "mrpast") for p in sys.path]
-        for p in sys_paths + [os.path.realpath(os.path.dirname(__file__))]:
+        for p in sys.path + [os.path.realpath(os.path.dirname(__file__))]:
             p = os.path.join(p, exe)
             if os.path.isfile(p):
                 result = p
@@ -269,10 +268,7 @@ def relate_polarize(
 def make_zarr(vcf_file: str, delete_orig: bool = False) -> str:
     """
     This method uses command-line tools to convert from VCF (uncompressed) to the ZARR/VCF that is required
-    for input to tsinfer. This process can be unfortunately quite slow. Requires tools:
-    * bgzip
-    * bcftools or tabix (just one)
-    * vcf2zarr
+    for input to tsinfer. Requires "vcf2zarr" to be installed (`pip install bio2zarr[vcf]`).
     Result will be the same name/directory as the original file, but with a .vcz extension.
     """
     dir = os.path.dirname(vcf_file)
@@ -282,28 +278,10 @@ def make_zarr(vcf_file: str, delete_orig: bool = False) -> str:
         raise FileExistsError(
             f"Output {vcz_file} already exists; remove and try again."
         )
-    bgzip = which("bgzip", required=True)
-    bcftools = which("bcftools")
-    tabix = which("tabix")
-    assert (
-        tabix is not None or bcftools is not None
-    ), "bcftools or tabix is required for conversion to ZARR/VCF. Please install one of the two."
     vcf2zarr = which("vcf2zarr", required=True)
     assert vcf2zarr is not None
 
-    with tempfile.TemporaryDirectory() as tmpdirname:
-        intermediate = os.path.join(tmpdirname, f"{base}.vcf.gz")
-        run(
-            f'{bgzip} "{vcf_file}" --stdout > "{intermediate}"',
-            shell=True,
-            verbose=True,
-        )
-        if tabix:
-            run([tabix, intermediate], verbose=True)
-        else:
-            assert bcftools
-            run([bcftools, "index", intermediate], verbose=True)
-        run([vcf2zarr, "convert", intermediate, vcz_file], verbose=True)
+    run([vcf2zarr, "convert", vcf_file, vcz_file], verbose=True)
     if delete_orig:
         os.remove(vcf_file)
     return vcz_file

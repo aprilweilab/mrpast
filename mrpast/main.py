@@ -164,7 +164,7 @@ def convert_simulation(
         f.write(pop_map.to_json(indent=2))
     vcf_file = f"{arg_file}.vcf"
     if emit_zarr:
-        out_file = make_zarr(vcf_file, delete_orig=True)
+        out_file = make_zarr(vcf_file, delete_orig=False)
     else:
         out_file = vcf_file
     print(f"Wrote {out_file} and {pop_map_file}")

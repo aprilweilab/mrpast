@@ -21,10 +21,7 @@ Installing dependencies
 
 - Download and unpack one of the Relate installations from the `relate webpage <https://myersgroup.github.io/relate/index.html>`_.
 - Create an environment variable ``RELATE_ROOT`` that points at your Relate installation's top-level directory. For Linux, this can be done via ``export RELATE_ROOT=/path/to/your/relate/`` (except with the correct path).
-- Now look for ``EstimatePopulationSize.sh`` script in your relate directory under ``relate/scripts/EstimatePopulationSize/EstimationPopulationSize.sh`` and comment out or remove the last line (it should start with ``Rscript``). The alternative is to ensure that you have `R installed <https://www.r-project.org/>`_ with the relevant modules.
-- Similarly, remove/comment out the last line of ``scripts/PrepareInputFiles/PrepareInputFiles.sh``
-
-See a Relate `Pull Request for fixing these issues <https://github.com/MyersGroup/relate/pull/4>`_ for more details.
+- You must use a version of Relate created after this `Pull Request <https://github.com/MyersGroup/relate/pull/4>`_ was merged.
 
 An Example
 ~~~~~~~~~~

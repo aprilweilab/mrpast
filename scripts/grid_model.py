@@ -59,8 +59,8 @@ if __name__ == "__main__":
     for d in range(demes):
         rate = random.uniform(RATE_LB, RATE_UB)
         print(f"  - ground_truth: {rate}")
-        print(f"    lb: {RATE_LB}")
-        print(f"    ub: {RATE_UB}")
+        print(f"    lb: {rate/10}")
+        print(f"    ub: {rate*10}")
 
     parameters = 0
     mig_rates = np.zeros((demes, demes), dtype=int)
@@ -98,5 +98,5 @@ if __name__ == "__main__":
     for _ in range(parameters):
         rate = random.uniform(RATE_LB, RATE_UB)
         print(f"  - ground_truth: {rate}")
-        print(f"    lb: {RATE_LB}")
-        print(f"    ub: {RATE_UB}")
+        print(f"    lb: {rate/10}")
+        print(f"    ub: {rate*10}")

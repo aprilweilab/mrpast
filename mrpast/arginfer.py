@@ -612,6 +612,7 @@ def relate_run(
                     seed,
                     "-o",
                     pop_prefix,
+                    "--noplot",
                 ]
             )
 

@@ -5,7 +5,7 @@ Using real data
 
 The workflow for analyzing real (non-simulated data) is typically:
 
-1. ``mrpast polarize`` the data; this requires Relate to be installed, since we currently make use of their polarization scripts.
+1. ``mrpast polarize`` the data.
 2. ``mrpast arginfer`` on the polarized data to produce ARGs.
 3. ``mrpast process --solve`` to process and solve the maximum likelihood problem.
 4. ``mrpast confidence`` to generate confidence intervals on the parameters.
