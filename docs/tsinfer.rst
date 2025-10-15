@@ -20,12 +20,10 @@ This page walks you through an example using mrpast's direct integration with
 Installing dependencies
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Install tsinfer and tsdate: ``pip install tsinfer tsdate bio2zarr --upgrade``
+Install tsinfer and tsdate: ``pip install tsinfer tsdate bio2zarr[vcf] --upgrade``
 
 The ``--upgrade`` is to ensure you have at least version ``0.4.1`` of tsinfer, which uses a new
 file format compared to older versions.
-
-You'll also need ``bgzip`` and ``tabix`` installed on your system.
 
 An Example
 ~~~~~~~~~~

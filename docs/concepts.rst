@@ -3,6 +3,30 @@
 Concepts
 ========
 
+.. note::
+  The ``mrpast`` command line often processes multiple chromosomes at once. Some
+  inputs, such as VCF files, recombination rate maps, and ancestral sequence
+  files, can be specified as either one for all chromosomes (if they are
+  identical) or one per chromosome. When you want to specify multiple files, you
+  must provide the file *prefix* and ``mrpast`` will search for all files with that
+  prefix matching the expected file extension. These files are then processed in
+  sorted order (lexicographic) and are assumed to match up with the other files (ARGs,
+  VCFs, etc) based on this order.
+
+Data Filtering
+--------------
+
+When using real data, people often apply some filtering criteria to the genotypes. It is important to note that
+overly aggressive filtering can have a negative impact on the construction of ARGs. ARGs rely on the density of
+segregating sites (polymorphic sites that separate samples from each other based on the presence or absence of
+certain alleles), and substantial changes to the number of segregating sites will have an impact on ``mrpast``.
+
+Generally, you should filter your data so that there are no non-SNPs variants (indels, SVs, etc.). ``tsinfer`` supports
+missing data, unknown ancestral state, and multi-allelic sites: though an excess of any of these may cause poor
+results (because ``tsinfer`` does not use these when building the ARG, it just maps them to the ARG afterwards). Other
+ARG inference methods do not support these features, so filtering will be needed to remove sites with missing
+data (or imputation performed), unknown ancestral state, and restrict to bi-allelic sites.
+
 Models
 ------
 
@@ -12,7 +36,7 @@ A mrpast input model specifies:
 2. The coalescence rate parameters for each deme (population).
 3. The migration rate parameters between each pair of demes (populations).
 4. The (optional) growth rate parameters for each deme (population).
-5. The conversions from one population to another, e.g. "pop1 was created as a split from pop2 after epoch2"
+5. The conversions from one population to another, e.g. "pop1 was created as a split from pop2 after epoch2" (also supports admixture of multiple source populations)
 6. The (optional) names of each population.
 
 More details about constructing and modifying models can be found `here <modeling.html>`_, and reading the heavily annotated
@@ -83,8 +107,8 @@ Bootstrapping is useful for computing confidence intervals and doing model selec
 Population Maps
 ---------------
 
-Each dataset has a ``N`` individuals that are mapped to ``P`` populations. The example models provided with mrpast expect input data
-that has anywhere from 3 and 20 populations. Every population in the model that is "active" during the most recent time epoch needs
+Each dataset has ``N`` individuals that are mapped to ``P`` populations. The example models provided with mrpast expect input data
+that has anywhere from 1 and 20 populations. Every population in the model that is "active" during the most recent time epoch needs
 to have associated individuals in the dataset. The population map is a JSON file that maps the individuals in the dataset to the
 populations in the model. The population names are provided in the population map, but it is the _order_ of populations between the
 model and the map that associates them. The population map JSON looks like:
@@ -131,8 +155,7 @@ These second, indirect methods, make use of the Godambe Information Matrix (GIM)
 
 Polarization
 -------------------------
-All three ARG methods integrated with mrpast work best with polarized data. If Relate is installed, mrpast can do the polarization for you via
-``mrpast polarize``. See the `relate <relate.html>`_ section for installation details. An ancestral FASTA sequence is required for performing
-polarization. The GRCh37 human ancestral sequence can be found via the
+All three ARG methods integrated with mrpast work best with polarized data. mrpast can do the polarization for you via
+``mrpast polarize``. An ancestral FASTA sequence is required for performing polarization. The GRCh37 human ancestral sequence can be found via the
 `relate documentation <https://myersgroup.github.io/relate/input_data.html#Data>`_, and GRCh38 human ancestral sequence can be found from
 Ensembl `here <https://ftp.ensembl.org/pub/release-112/fasta/ancestral_alleles/>`_.

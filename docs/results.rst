@@ -37,8 +37,8 @@ can be examined using :py:meth:`mrpast.result.load_json_pandas`. Example:
 Bootstrap confidence intervals
 ------------------------------
 
-``mrpast confidence --bootstrap solver_output.json`` can be pretty slow, as it runs every bootstrap sample through
-the maximum likelihood solver and produces results in two places:
+``mrpast confidence --bootstrap solver_output.json`` can be pretty slow (hint: use ``-j <threads>`` to speed it up), as it runs every
+bootstrap sample through the maximum likelihood solver and produces results in two places:
 
 1. Directory ``solver_output.bootstrap.out/`` which contains all of the intermediate solver results for every bootstrap sample.
 2. File ``solver_output.bootstrap.csv`` which contains a summary of all of the parameter and likelihood values for every bootstrap sample.
@@ -66,7 +66,7 @@ AIC can rank multiple possible models that have been evaluated on the same data.
 that often overly complex models (i.e., more complex than the model that generated the data) can sometimes be selected, or have an AIC score
 very close to the true model's. For these reasons, it is recommended to look at a distribution of the AIC scores over the set of bootstrap
 samples. mrpast contains a check to verify the bootstrap samples between two competing models are identical, because the data must be the same
-for a fair evaluation of the models. If the distributions of AIC values are indistinguishable, then often the simpler model should be
+for a fair evaluation of the models. If the distributions of AIC values are indistinguishable, then the simpler model should be
 preferred.
 
 AIC on a single result
@@ -113,6 +113,8 @@ This command will fail if you have not previously run:
 
 
 The ``modelA_modelB.bootstrap.AIC.json`` output JSON has the same format as the non-bootstrap version.
+Hint: you can use the ``--replicates`` flag to reduce the number of solver replicates for each bootstrap run
+to speed up the bootstrap process.
 
 Reading/processing results
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
