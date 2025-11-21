@@ -6,7 +6,7 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
 PACKAGE_NAME = "mrpast"
-VERSION = "0.1"
+VERSION = "0.2"
 
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -33,6 +33,30 @@ class CMakeExtension(Extension):
         self.extra_executables = extra_executables
 
 
+SKIP_DIRS = set(
+    [
+        "third-party/nlopt/.github",
+        "third-party/nlopt/doc",
+        "third-party/nlopt/test",
+        "third-party/eigen/.gitlab",
+        "third-party/eigen/bench",
+        "third-party/eigen/doc",
+        "third-party/eigen/debug",
+        "third-party/eigen/demos",
+    ]
+)
+
+
+def all_files_beneath(source_dir: str):
+    result = []
+    for dirname, _, files in os.walk(source_dir):
+        if dirname in SKIP_DIRS:
+            continue
+        for filename in files:
+            result.append(os.path.join(dirname, filename))
+    return result
+
+
 class CMakeBuild(build_ext):
     def get_source_files(self):
         return [
@@ -46,7 +70,8 @@ class CMakeBuild(build_ext):
             "src/objective.h",
             "src/solve.cpp",
             "src/solve.h",
-        ]
+            "test/test_derivs.cpp",
+        ] + all_files_beneath("third-party/")
 
     def build_extensions(self):
         assert len(self.extensions) == 1
