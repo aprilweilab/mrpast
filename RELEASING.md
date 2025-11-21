@@ -6,8 +6,11 @@ Docker image).
 
 ## Version numbering
 
-Version numbering follows picovcf's version, always. Bump the version in setup.py whenever
-a release is done on GitHub.
+Bump the version in setup.py whenever a release is done on GitHub. Major version number is
+incremented on breaking changes, minor version number is incremented for backwards-
+compatible changes.
+
+Version number needs to be updated in `setup.py` and `conda/meta.yaml`.
 
 ## Packaging for PyPi
 
@@ -31,6 +34,12 @@ sudo chgrp -R ddehaas dist/
 cp ./dist/*.tar.gz ./dist/wheelhouse/
 
 ```
+
+Test the source distribution:
+```
+pip install --force-reinstall ./dist/wheelhouse/mrpast-*.tar.gz
+```
+
 
 To upload to PyPi:
 ```

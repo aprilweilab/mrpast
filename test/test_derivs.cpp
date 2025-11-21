@@ -1,19 +1,22 @@
 #include <gtest/gtest.h>
 
-// We use autodiff to check the quality of our numerical differentiation implementation.
-// autodiff produces numerical evaluations of _analytic_ derivatives, via Eigen and the
-// std:: math library. In contrast, our implementation produces numerical approximations
-// of a derivative at a point -- autodiff should always be more accurate for the set of
-// primitives that it supports.
-#include <autodiff/reverse/var.hpp>
-
 #include <string>
 #include <vector>
 
 #include "derivatives.h"
 
 // Set to 1 to emit CSV data for plotting derivative results.
-#define EMIT_CSV_DATA 1
+#define EMIT_CSV_DATA 0
+
+#if EMIT_CSV_DATA
+// We use autodiff to check the quality of our numerical differentiation implementation.
+// autodiff produces numerical evaluations of _analytic_ derivatives, via Eigen and the
+// std:: math library. In contrast, our implementation produces numerical approximations
+// of a derivative at a point -- autodiff should always be more accurate for the set of
+// primitives that it supports.
+#include <autodiff/reverse/var.hpp>
+#endif
+
 
 inline void ENSURE_UNCHANGED(
         const std::vector<double>& origParams,
@@ -123,6 +126,7 @@ inline std::string TS(double value) {
     return std::move(ss.str());
 }
 
+#if EMIT_CSV_DATA
 TEST(FirstOrder, ThreeD_Test1) {
     std::string experiment = "x*log(x*y)*exp(z)";
     const double yVal = 0.5;
@@ -237,6 +241,7 @@ TEST(FirstOrder, TwoD_Test1) {
         emitCsvLine<std::string>({experiment, "f_xy", TS(xVal), TS(yVal), TS(0.0), TS(newDxy), TS(oldDxy)});
    }
 }
+#endif
 
 TEST(Helpers, Vary1Param) {
     auto costFunc = [&](const double* parameters) {

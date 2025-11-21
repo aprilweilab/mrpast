@@ -2,7 +2,8 @@
 
 # mrpast
 
-Infer demographic parameters from Ancestral Recombination Graphs (ARGs).
+Infer demographic parameters from Ancestral Recombination Graphs (ARGs). See [the preprint](https://www.biorxiv.org/content/10.1101/2025.10.07.680347v1)
+for details on the method and results.
 
 ## Install
 
