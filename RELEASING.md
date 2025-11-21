@@ -10,6 +10,8 @@ Bump the version in setup.py whenever a release is done on GitHub. Major version
 incremented on breaking changes, minor version number is incremented for backwards-
 compatible changes.
 
+Version number needs to be updated in `setup.py` and `conda/meta.yaml`.
+
 ## Packaging for PyPi
 
 Build the package distributions for PyPi. We build a source dist and then Linux binary distributions for recent Python versions. The container is from the [manylinux](https://github.com/pypa/manylinux) project.
