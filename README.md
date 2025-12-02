@@ -1,5 +1,7 @@
 ![](https://github.com/aprilweilab/mrpast/actions/workflows/python-package.yml/badge.svg)
 
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/mrpast/README.html)
+
 # mrpast
 
 Infer demographic parameters from Ancestral Recombination Graphs (ARGs). See [the preprint](https://www.biorxiv.org/content/10.1101/2025.10.07.680347v1)
@@ -15,6 +17,8 @@ pip install mrpast
 ```
 
 On Linux, this will use prebuilt binaries. On MacOS, this will trigger a source code build, which requires CMake and gcc or clang (C++17 support required).
+
+You can also install the [conda package](https://bioconda.github.io/recipes/mrpast/README.html) via the [bioconda](https://bioconda.github.io/) channel: `conda install mrpast`.
 
 ## Build/Install from repository
 
