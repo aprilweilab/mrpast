@@ -159,3 +159,14 @@ All three ARG methods integrated with mrpast work best with polarized data. mrpa
 ``mrpast polarize``. An ancestral FASTA sequence is required for performing polarization. The GRCh37 human ancestral sequence can be found via the
 `relate documentation <https://myersgroup.github.io/relate/input_data.html#Data>`_, and GRCh38 human ancestral sequence can be found from
 Ensembl `here <https://ftp.ensembl.org/pub/release-112/fasta/ancestral_alleles/>`_.
+
+Model/ARG Population Mismatches
+-------------------------------
+
+You might end up in a situation where the populations in an ARG that you want to use do not match up exactly to the populations in a model
+that you want to use. A few examples are:
+
+1. You inferred an ARG containing 3 populations, but you want to use a model that only uses two of them. You could handle this by using the ``--leave-out`` option when calling ``mrpast process``, or you could downsample the ARG(s) first to remove the unneeded samples (see `tskit.TreeSequence.simplify() <https://tskit.dev/tskit/docs/stable/python-api.html#tskit.TreeSequence.simplify>`_), or you could reinfer the ARGs with only the relevant samples. Note that having these extra samples will affect ARG inference; whether this matters will depend on your use case.
+2. You inferred an ARG containing 4 populations, but you want to use a model that contains another (5th) population. Here, you need to treat one of these populations as unsampled and use the ``--map-pops`` option to specify how the ARG populations map to model populations.
+
+See the `examples <examples.html>`_ page for more details.
