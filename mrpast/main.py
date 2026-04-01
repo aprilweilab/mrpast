@@ -844,7 +844,7 @@ def main():
         "--map-pops",
         default=None,
         help=f"A list of <idx1>:<idx2>, comma-separated, which maps a particular population to another population, based on their "
-        "0-based indices. Useful for when the ARG populations are in a different order (or have ghosts) compared to the model.",
+        "0-based indices. Useful for when the ARG populations are in a different order (or not sampled) compared to the model.",
     )
 
     solve_parser = subparsers.add_parser(

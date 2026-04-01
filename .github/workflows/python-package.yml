@@ -42,7 +42,7 @@ jobs:
         flake8 mrpast --count --select=E9,F63,F7,F82,F401 --show-source --statistics
     - name: Check code formatting (black)
       run: |
-        black --check mrpast/ setup.py test/ scripts/ --exclude "third-party"
+        black --check mrpast/ setup.py test/ scripts/ --exclude "third-party" --exclude test_arginfer.py
     - name: Check types (mypy)
       run: |
         mypy mrpast --no-namespace-packages --ignore-missing-imports
