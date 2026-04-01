@@ -26,7 +26,6 @@ from mrpast.helpers import (
 )
 from mrpast.model import UserModel, ParamRef
 
-
 MAX_EPOCH = 2**32
 
 
@@ -277,7 +276,7 @@ def run_simulation(
         for ident, rate_map in zip(range(num_replicates), rates_per_rep)
     ]
     if jobs == 1:
-        tree_counts = [_run_simulation(*work[0])]
+        tree_counts = [_run_simulation(*w) for w in work]
     else:
         with Pool(jobs) as p:
             tree_counts = p.starmap(_run_simulation, work)

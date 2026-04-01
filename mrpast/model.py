@@ -28,7 +28,6 @@ import random
 import json
 import os
 
-
 DEFAULT_PLOIDY = 2
 
 
