@@ -27,7 +27,7 @@ import numpy as np
 import orjson
 import tskit
 
-from mrpast.helpers import count_lines
+from mrpast.helpers import count_lines, UserInputError
 from mrpast.model import PopMap
 
 DemePairIndex = Dict[Tuple[int, int], int]
@@ -467,7 +467,13 @@ def process_coal_file(
                 pop_i = pop_idx_map.get(pop_i, pop_i)
                 pop_j = int(pop_j)
                 pop_j = pop_idx_map.get(pop_j, pop_j)
-                a_b = deme_pair_to_index[pop_i, pop_j]
+                try:
+                    a_b = deme_pair_to_index[pop_i, pop_j]
+                except KeyError as e:
+                    max_refd_pop = max(pop_i, pop_j)
+                    raise UserInputError(
+                        f"Data from the ARG(s) have at least {max_refd_pop+1} populations, which exceeds the population count in the model"
+                    )
                 # Add a sample for a particular tree, Markov state a_b, discretized
                 # time tau, and coalescence "weight" w.
                 sampler.add_sample(tree_number, a_b, discretize(t), w)

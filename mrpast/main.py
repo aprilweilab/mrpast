@@ -48,6 +48,7 @@ from mrpast.helpers import (
     which,
     load_old_mrpast,
     one_file_or_one_per_chrom,
+    UserInputError,
 )
 from mrpast.simulate import (
     run_simulation,
@@ -225,13 +226,19 @@ def get_popsummary_from_args(
     result: List[Tuple[str, int]] = []
     for tf in tree_files:
         ts = tskit.load(tf)
+        # The ARG or the Model can have more populations than the other. When the ARG has more
+        # populations, --leave-out must be used to drop some of them. When the Model has more,
+        # those populations can remain unsampled from the ARG and inference can proceed.
         largest_mapped = 0
         if pop_idx_map:
             largest_mapped = max(pop_idx_map.values())
         pop2names = ["N/A" for _ in range(max(ts.num_populations, largest_mapped + 1))]
         for pop in ts.populations():
-            pop_id = pop_idx_map.get(pop.id, pop.id)
-            pop2names[pop_id] = pop.metadata.get("name", f"pop_{pop_id}")
+            if pop.id in leave_out_pops:
+                del pop2names[pop.id]
+            else:
+                pop_id = pop_idx_map.get(pop.id, pop.id)
+                pop2names[pop_id] = pop.metadata.get("name", f"pop_{pop_id}")
         assert all(map(lambda pstr: len(pstr) > 0, pop2names))
         pop2count = [0 for _ in pop2names]
         for tree in ts.trees():
@@ -1084,31 +1091,37 @@ def main():
 
         leave_out = parse_intlist(args.leave_out)
 
-        process_ARGs(
-            args.model,
-            args.arg_prefix,
-            args.suffix,
-            args.jobs,
-            do_solve=args.solve,
-            out_dir=args.out_dir,
-            add_ground_truth=args.add_ground_truth,
-            num_times=num_times,
-            replicates=args.replicates,
-            bootstrap=args.bootstrap,
-            bootstrap_iter=args.bootstrap_iter,
-            max_generation=args.max_generation,
-            tree_sample_rate=args.tree_sample_rate,
-            min_time_unit=args.min_time_unit,
-            leave_out=leave_out,
-            group_by=args.group_by,
-            time_slice_str=args.time_slices,
-            verbose=args.verbose,
-            rate_maps=args.rate_maps,
-            rate_map_threshold=args.rate_map_threshold,
-            left_skew_times=left_skew,
-            seed=args.seed,
-            pop_idx_map=pop_idx_map,
-        )
+        try:
+            process_ARGs(
+                args.model,
+                args.arg_prefix,
+                args.suffix,
+                args.jobs,
+                do_solve=args.solve,
+                out_dir=args.out_dir,
+                add_ground_truth=args.add_ground_truth,
+                num_times=num_times,
+                replicates=args.replicates,
+                bootstrap=args.bootstrap,
+                bootstrap_iter=args.bootstrap_iter,
+                max_generation=args.max_generation,
+                tree_sample_rate=args.tree_sample_rate,
+                min_time_unit=args.min_time_unit,
+                leave_out=leave_out,
+                group_by=args.group_by,
+                time_slice_str=args.time_slices,
+                verbose=args.verbose,
+                rate_maps=args.rate_maps,
+                rate_map_threshold=args.rate_map_threshold,
+                left_skew_times=left_skew,
+                seed=args.seed,
+                pop_idx_map=pop_idx_map,
+            )
+        except UserInputError as e:
+            print("", file=sys.stderr)
+            print("FAILURE: Invalid user input", file=sys.stderr)
+            print(e, file=sys.stderr)
+            exit(5)
         header = ["Model Population", "ARG Population", "Haploid Samples"]
         arg_pops = get_popsummary_from_args(
             args.arg_prefix,
@@ -1120,7 +1133,7 @@ def main():
         print()
         if len(arg_pops) != len(model.pop_names):
             print(
-                f"ERROR: Model has {len(model.pop_names)} populatons, but ARG only has {len(arg_pops)}",
+                f"ERROR: Model has {len(model.pop_names)} populatons, but the ARG has {len(arg_pops)}",
                 file=sys.stderr,
             )
             fail = True

@@ -43,6 +43,10 @@ except ImportError:
     from yaml import Loader, Dumper  # type: ignore
 
 
+class UserInputError(Exception):
+    pass
+
+
 def which(exe: str, required=False) -> Optional[str]:
     """
     Find the named executable, first via system PATH and then via the Python PATH.

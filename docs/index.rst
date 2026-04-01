@@ -77,5 +77,6 @@ Use the links below or on the left menu-bar to learn more.
   Examining results <results>
   Using real data <real_data>
   Creating/modifying models <modeling>
+  Very short examples <examples>
   python_api
 
