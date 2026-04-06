@@ -78,6 +78,7 @@ from mrpast.simprocess import (
 from mrpast.result import (
     load_json_pandas,
     tab_show,
+    summarize_bootstrap_data,
 )
 
 DEFAULT_INDIVIDUALS = 10  # per population
@@ -1010,10 +1011,23 @@ def main():
         "solved_result", help="A JSON file output by the solver."
     )
     confidence_parser.add_argument(
+        "--simple-expect",
+        action="store_true",
+        help="NOT RECOMMENDED. Calculate the Jacobian from the MLE, instead of averaging the gradients over "
+        "many samples (bootstraps or ARG samples). This can help with some numerical issues, but the resulting "
+        "parameter intervals are likely to be over-confident.",
+    )
+    confidence_parser.add_argument(
         "--bootstrap",
         "-b",
         action="store_true",
-        help="Solve for all bootstrapped samples instead of using GIM (theoretical).",
+        help="Solve MLE for all bootstrapped samples; can be very slow on large models!",
+    )
+    confidence_parser.add_argument(
+        "--gim",
+        "-g",
+        action="store_true",
+        help="Use the GIM method of computing confidence intervals. Faster, but possibly less accurate than bootstrapping.",
     )
     confidence_parser.add_argument(
         "--replicates",
@@ -1218,14 +1232,46 @@ def main():
             )
             exit(1)
     elif args.command == CMD_CONFIDENCE:
-        if not args.bootstrap:
-            result = subprocess.check_output(
-                [eval_exe, "intervals", args.solved_result]
+        if args.bootstrap:
+            print(
+                "WARNING: --bootstrap is now the default, and no longer needs to be specified. Use --gim to get GIM-based results."
             )
+        base_name = remove_ext(os.path.basename(args.solved_result))
+        if args.gim:
+            cmd = [eval_exe, "intervals", args.solved_result]
+            if args.simple_expect:
+                cmd.append("--simple-expect")
+                print(
+                    "WARNING: --simple-expect is EXPERIMENTAL, and may result in overly-confident parameter intervals.",
+                    file=sys.stderr,
+                )
+            result = subprocess.check_output(cmd)
             resulting_obj = json.loads(result.decode("utf-8"))
-            print(json.dumps(resulting_obj, indent=2))
+
+            json_file = f"{base_name}.gim.json"
+            with open(json_file, "w") as fout:
+                fout.write(json.dumps(resulting_obj, indent=2))
+            print(f"Wrote output with GIM 95% conf. intervals to {json_file}")
+
+            csv_file = f"{base_name}.gim_summary.csv"
+            summary_df = load_json_pandas(json_file, interval_field="gim_ci")
+            summary_df.index.name = "param_index"
+            summary_df.drop(
+                columns=[
+                    "gim_ci",
+                    "final",
+                    "kind",
+                    "kind_index",
+                    "lb",
+                    "ub",
+                    "init",
+                    "ground_truth",
+                ]
+            ).to_csv(csv_file, index=False)
+            print(
+                f"Wrote parameter summary (95% conf. intervals) DataFrame to {csv_file}"
+            )
         else:
-            base_name = remove_ext(os.path.basename(args.solved_result))
             out_dir = f"{base_name}.bootstrap.out"
             if os.path.exists(out_dir):
                 print(
@@ -1260,6 +1306,7 @@ def main():
                 print(f"Best result for matrix {i}: {best_output}")
                 if best_output is not None:
                     best_df = load_json_pandas(best_output)
+                    best_df.index.name = "param_index"
                     sample_column = [i for _ in range(len(best_df))]
                     best_df["sample"] = sample_column
                     negLL_column = [best_negLL for _ in range(len(best_df))]
@@ -1267,7 +1314,17 @@ def main():
                     result_df = pd.concat([result_df, best_df])
             csv_file = f"{base_name}.bootstrap.csv"
             result_df.to_csv(csv_file)
-            print(f"Wrote DataFrame to {csv_file}")
+            print(f"Wrote raw results DataFrame to {csv_file}")
+
+            csv_file = f"{base_name}.bs_summary.csv"
+            summary_df = summarize_bootstrap_data(
+                result_df, use_median=True, interval_conf=0.95
+            )
+            summary_df.to_csv(csv_file, index=False)
+            print(
+                f"Wrote parameter summary (95% conf. intervals) DataFrame to {csv_file}"
+            )
+
     elif args.command == CMD_POLARIZE:
         out_file = args.out_prefix + ".vcf"
         if os.path.exists(out_file):
@@ -1277,7 +1334,11 @@ def main():
         print(f"Finished polarizing. Wrote {out_file}")
         stats.print(sys.stdout, prefix="  ")
     elif args.command == CMD_SHOW:
-        tab_show(args.solved_result, args.sort_by)
+        if args.solved_result.endswith(".csv"):
+            df = pd.read_csv(args.solved_result)
+            print(df)
+        else:
+            tab_show(args.solved_result, args.sort_by)
     elif args.command == CMD_SELECT:
         cmd = [eval_exe, "select"]
         if args.bootstrap:

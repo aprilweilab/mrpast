@@ -43,6 +43,8 @@ using json = nlohmann::json;
 // more numerically stable than taking the inverse of J and GIM.
 #define SINGLE_INVERSE_CALCULATION 1
 
+#define TRACE_MATRICES 0
+
 #if TRACE_MATRICES
 #define TRACE_MATRIX(m, desc)                                                                                          \
     do {                                                                                                               \
@@ -154,9 +156,9 @@ std::vector<double> loadNegLL(std::ifstream& inStream) {
 }
 
 // Return the inverse of the given matrix.
-inline MatrixXd invert(const MatrixXd& m) {
+inline MatrixXd invert(const MatrixXd& m, const char* matrixDesc) {
     Eigen::FullPivLU<MatrixXd> lu(m);
-    RELEASE_ASSERT(lu.isInvertible());
+    user_exc_check(lu.isInvertible(), matrixDesc << " is not invertible; try --fix-non-invertible");
     return lu.inverse();
 }
 
@@ -268,6 +270,13 @@ void intervalsCommand(args::Subparser& parser) {
                                 "When the H matrix is non-invertible, try holding a single parameter constant (usually "
                                 "an epoch time) to see if it becomes invertible",
                                 {'f', "fix-non-invertible"});
+    args::Flag simpleExpect(parser,
+                            "simpleExpect",
+                            "Compute the expected gradient from the MLE directly, instead of averaging the gradients "
+                            "over all samples (boostraps, ARGs, etc). This can help with numerical issues on certain "
+                            "models/samples but WILL result in overly confident confidence intervals.",
+                            {"simple-expect"});
+
     parser.Parse();
     if (!inputFile) {
         std::cerr << parser << std::endl;
@@ -308,20 +317,28 @@ void intervalsCommand(args::Subparser& parser) {
     json outputResult = cost.m_schema.toJsonOutput(paramVector.data(), prevResultJson.at("negLL"));
     VectorXd uncertaintySE = VectorXd::Zero(SIZE_T_TO_INDEX(paramVector.size()));
 
+    const char* gradientErr = "try switching to bootstrap-based intervals";
+    const char* hessianErr = "try using fewer time slices or switching to bootstrap-based intervals";
+
     size_t leftOut = std::numeric_limits<size_t>::max();
     auto [variabilityJ, sensitivityH] =
-        getJandH(cost, paramVector, leftOut, /*bootstrap=*/true, /*fixNonInvertible=*/fixNonInvertible);
+        getJandH(cost, paramVector, leftOut, /*bootstrap=*/!simpleExpect, /*fixNonInvertible=*/fixNonInvertible);
+    user_exc_check(variabilityJ.allFinite(), "J (jacobian/gradients) is not finite; " << gradientErr);
+    user_exc_check(sensitivityH.allFinite(), "H (hessian) is not finite; " << hessianErr);
 
 #if SINGLE_INVERSE_CALCULATION
-    MatrixXd H_inverse = invert(sensitivityH);
+    MatrixXd H_inverse = invert(sensitivityH, "H matrix");
+    user_exc_check(H_inverse.allFinite(), "inverse(H) is not finite; " << hessianErr);
     MatrixXd GIM_inverse = H_inverse * variabilityJ * H_inverse;
     TRACE_MATRIX(GIM_inverse, "GIM_inverse");
+    user_exc_check(GIM_inverse.allFinite(), "inverse(G) is not finite; " << gradientErr);
 #else
-    MatrixXd GIM = (sensitivityH * invert(variabilityJ)) * sensitivityH;
+    MatrixXd GIM = (sensitivityH * invert(variabilityJ, "J matrix")) * sensitivityH;
     TRACE_MATRIX(GIM, "GIM");
-    MatrixXd GIM_inverse = invert(GIM);
+    MatrixXd GIM_inverse = invert(GIM, "GIM matrix");
 #endif
     const VectorXd gimDiag = GIM_inverse.diagonal().array().sqrt();
+    user_exc_check(gimDiag.allFinite(), "sqrt(diag(GIM)) is not finite; " << gradientErr);
     RELEASE_ASSERT(gimDiag.size() == paramVector.size() ||
                    gimDiag.size() == (paramVector.size() - 1) && leftOut < paramVector.size());
 
@@ -430,7 +447,7 @@ void selectCommand(args::Subparser& parser) {
         size_t leftOut = std::numeric_limits<size_t>::max();
         auto [variabilityJ, sensitivityH] =
             getJandH(cost, paramVector, leftOut, /*bootstrap=*/true, /*fixNonInvertible=*/fixNonInvertible);
-        const double currentTrace = (variabilityJ * invert(sensitivityH)).trace();
+        const double currentTrace = (variabilityJ * invert(sensitivityH, "H matrix")).trace();
         if (currentTrace <= 0) {
             std::cerr << "WARNING: Non-positive trace value of " << currentTrace << std::endl;
             if (failOnNegTrace) {
@@ -647,6 +664,10 @@ int main(int argc, char** argv) {
     } catch (args::Error& e) {
         std::cerr << e.what() << std::endl << parser;
         return 1;
+    } catch (UserNotification& e) {
+        std::cerr << std::endl;
+        std::cerr << "ERROR! " << e.what() << std::endl;
+        return 2;
     }
     return 0;
 }

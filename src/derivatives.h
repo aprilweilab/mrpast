@@ -339,7 +339,7 @@ inline MatrixXd calculateSensitivity(CostFunc& cost, const std::vector<double>& 
     std::vector<double> paramsWorking = optParams;
 
     // We are computing an approximation to the expectation of the second order
-    // gradeints, for which we just use the optimal parameters (theta-hat) and the
+    // gradients, for which we just use the optimal parameters (theta-hat) and the
     // "true" observed data (coalescence matrix).
     cost.resetCMatrixCache();
 
@@ -426,8 +426,10 @@ calculateVariability(CostFunc& cost, const std::vector<double>& optParams, const
 #endif
     }
 
+#if DEBUG_VARIANCE
+    std::vector<MatrixXd> gradients;
+#endif
     MatrixXd expectedJ = MatrixXd::Zero(N, N);
-    VectorXd expectedGrad = VectorXd::Zero(N);
     for (size_t sample = 0; sample < numSamples; sample++) {
         if (bootstrap) {
             // Only use the ith coal matrix
@@ -445,9 +447,23 @@ calculateVariability(CostFunc& cost, const std::vector<double>& optParams, const
             gradient[j] = riddersD1(cost, paramsWorking, directions, j, step);
 #endif
         }
-        expectedJ += (gradient * gradient.transpose());
+        auto currentJ = (gradient * gradient.transpose());
+        expectedJ += currentJ;
+#if DEBUG_VARIANCE
+        gradients.emplace_back(std::move(currentJ));
+#endif
     }
     expectedJ /= (double)numSamples;
+
+#if DEBUG_VARIANCE
+    MatrixXd varianceJ = MatrixXd::Zero(N, N);
+    for (size_t sample = 0; sample < numSamples; sample++) {
+        auto diff = (gradients[sample] - expectedJ);
+        varianceJ += (diff.array() * diff.array()).matrix();
+    }
+    varianceJ /= (double)numSamples;
+    DUMP_MATRIX(varianceJ, "varianceJ");
+#endif
 
     return std::move(expectedJ);
 }

@@ -107,4 +107,41 @@ constexpr auto MRP_OPT_ALG = NLOPT_LN_SBPLX; // Best in initial testing
 // GRADIENT-BASED:
 // constexpr auto MRP_OPT_ALG = NLOPT_LD_LBFGS; // Best of gradient methods in initial testing
 
+/**
+ * Exception thrown to notify the user of some condition that they can potentially address (model
+ * problem, user input problem, numerical issue with their results, etc.)
+ */
+class UserNotification : public std::runtime_error {
+public:
+    explicit UserNotification(char const* const message)
+        : std::runtime_error(message) {}
+};
+
+#define user_exc_check(condition, msg)                                                                                 \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            std::stringstream ssErr;                                                                                   \
+            ssErr << msg;                                                                                              \
+            throw UserNotification(ssErr.str().c_str());                                                               \
+        }                                                                                                              \
+    } while (0)
+
+#define DUMP_MATRIX(m, desc)                                                                                           \
+    do {                                                                                                               \
+        std::cerr << "% " << desc << ": " << std::endl;                                                                \
+        std::cerr << "[";                                                                                              \
+        for (Eigen::Index i = 0; i < (m).rows(); i++) {                                                                \
+            if (i > 0) {                                                                                               \
+                std::cerr << "; ";                                                                                     \
+            }                                                                                                          \
+            for (Eigen::Index j = 0; j < (m).cols(); j++) {                                                            \
+                if (j > 0) {                                                                                           \
+                    std::cerr << ", ";                                                                                 \
+                }                                                                                                      \
+                std::cerr << (m).coeff(i, j);                                                                          \
+            }                                                                                                          \
+        }                                                                                                              \
+        std::cerr << "]" << std::endl;                                                                                 \
+    } while (0)
+
 #endif /* MRP_SOLVER_COMMON_H */

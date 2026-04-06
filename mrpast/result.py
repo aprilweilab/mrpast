@@ -228,7 +228,11 @@ def summarize_bootstrap_data(
     ), f"Unsupported confidence {interval_conf}; try 1.0, 0.99, 0.95, 0.9, or 0.75"
 
     def get_singular(df, label, field):
-        value = set(df[df["label"] == label][field])
+        items = df[df["label"] == label][field]
+        # We string-ify lists so that we can uniquify them
+        if items.dtype == object:
+            items = items.astype(str)
+        value = set(items)
         assert len(value) == 1
         return list(value)[0]
 
@@ -263,10 +267,9 @@ def summarize_bootstrap_data(
                 "std": std_err,
                 "Epochs": get_singular(bootstrap_df, label, "Epochs"),
                 "covered": (truth >= (value - c95_low) and truth <= (value + c95_hi)),
-                "param_index": get_singular(bootstrap_df, label, "Unnamed: 0"),
             }
         )
-    return pd.DataFrame.from_dict(new_data).sort_values("param_index")
+    return pd.DataFrame.from_dict(new_data).sort_values("label")
 
 
 def draw_graphs(

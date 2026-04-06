@@ -22,28 +22,25 @@ Parameter confidence intervals
 
 There are two methods for producing confidence intervals, but the ``mrpast confidence`` command is used for both.
 
-Theoretical confidence intervals
---------------------------------
-
-``mrpast confidence solver_output.json > solver_output.gim.json`` will make a copy of ``solver_output.json`` that
-contains a confidence interval for each parameter (using the Godambe Information Matrix formulation). These intervals
-can be examined using :py:meth:`mrpast.result.load_json_pandas`. Example:
-
-::
-
-  from mrpast.result import load_json_pandas
-  dataframe = load_json_pandas("solver_output.gim.json", interval_field="gim_ci")
-
 Bootstrap confidence intervals
 ------------------------------
 
-``mrpast confidence --bootstrap solver_output.json`` can be pretty slow (hint: use ``-j <threads>`` to speed it up), as it runs every
+``mrpast confidence solver_output.json`` can be pretty slow (hint: use ``-j <threads>`` to speed it up), as it runs every
 bootstrap sample through the maximum likelihood solver and produces results in two places:
 
 1. Directory ``solver_output.bootstrap.out/`` which contains all of the intermediate solver results for every bootstrap sample.
 2. File ``solver_output.bootstrap.csv`` which contains a summary of all of the parameter and likelihood values for every bootstrap sample.
 
-The confidence intervals are not actually in either output, you need to use :py:meth:`mrpast.result.summarize_bootstrap_data`. Example:
+The confidence intervals are not actually in either output, you need to use either ``mrpast show`` or
+:py:meth:`mrpast.result.summarize_bootstrap_data`. Examples:
+
+::
+
+  mrpast show solver_output.bs_summary.csv
+
+
+OR
+
 
 ::
 
@@ -55,6 +52,32 @@ The confidence intervals are not actually in either output, you need to use :py:
 
   # The summarized dataframe, which contains the mean or median parameter values, and their confidence intervals.
   sum_dataframe = summarize_bootstrap_data(raw_dataframe, use_median=True, interval_conf=0.95)
+
+
+Theoretical confidence intervals
+--------------------------------
+
+Using the GIM-based confidence intervals is much faster, but likely less accurate, than using
+the bootstrapped intervals. The bootstrapped intervals are recommended for use, unless you are
+using a model so large that bootstrapping is computationally infeasible (in which case, the
+confidence intervals should be taken with a grain of salt).
+
+``mrpast confidence --gim solver_output.json`` will make a copy of ``solver_output.json``  (``solver_output.gim.json``) that
+contains a confidence interval for each parameter (using the Godambe Information Matrix formulation). These intervals
+can be examined using :py:meth:`mrpast.result.load_json_pandas`. Example:
+
+::
+
+  from mrpast.result import load_json_pandas
+  dataframe = load_json_pandas("solver_output.gim.json", interval_field="gim_ci")
+
+
+It also outputs a summary ``.csv`` file that can be used with ``mrpast show``:
+
+::
+
+  mrpast show solver_output.gim_summary.csv
+
 
 Model selection
 ~~~~~~~~~~~~~~~
@@ -108,8 +131,8 @@ This command will fail if you have not previously run:
 ::
 
   # Very SLOW! Solves for all bootstrap samples
-  mrpast confidence -j 8 --bootstrap best.modelA.out.json
-  mrpast confidence -j 8 --bootstrap best.modelB.out.json 
+  mrpast confidence -j 8 best.modelA.out.json
+  mrpast confidence -j 8 best.modelB.out.json
 
 
 The ``modelA_modelB.bootstrap.AIC.json`` output JSON has the same format as the non-bootstrap version.
@@ -133,6 +156,6 @@ The result of ``mrpast solve`` or ``mrpast process --solve`` can be imported as 
 Dataframe for bootstrap results
 -------------------------------
 
-The result of ``mrpast confidence --bootstrap`` can also be imported as a dataframe using
+The result of ``mrpast confidence`` can also be imported as a dataframe using
 :py:meth:`mrpast.result.summarize_bootstrap_data`. See the example above. The bootstrap results
 contain more than just confidence interval information.
