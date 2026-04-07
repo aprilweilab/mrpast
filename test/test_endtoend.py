@@ -68,6 +68,8 @@ class EndToEndTests(unittest.TestCase):
                 MRPAST
                 + [
                     "process",
+                    "--out-dir",
+                    tmpdirname,
                 ]
                 + extra_args
                 + [

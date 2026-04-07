@@ -42,24 +42,6 @@ using Eigen::VectorXd;
 // to produce slightly better point estimates with definitely better confidence intervals.
 #define FEWER_SUBTRACTIONS_PER_EPOCH 1
 
-#define DUMP_MATRIX(m, desc)                                                                                           \
-    do {                                                                                                               \
-        std::cerr << "% " << desc << ": " << std::endl;                                                                \
-        std::cerr << "[";                                                                                              \
-        for (Eigen::Index i = 0; i < (m).rows(); i++) {                                                                \
-            if (i > 0) {                                                                                               \
-                std::cerr << "; ";                                                                                     \
-            }                                                                                                          \
-            for (Eigen::Index j = 0; j < (m).cols(); j++) {                                                            \
-                if (j > 0) {                                                                                           \
-                    std::cerr << ", ";                                                                                 \
-                }                                                                                                      \
-                std::cerr << (m).coeff(i, j);                                                                          \
-            }                                                                                                          \
-        }                                                                                                              \
-        std::cerr << "]" << std::endl;                                                                                 \
-    } while (0)
-
 #if TRACE_MATRICES
 #define TRACE_MATRIX(m, desc) DUMP_MATRIX(m, desc)
 #define TRACELN(msg)          std::cerr << msg << std::endl;
