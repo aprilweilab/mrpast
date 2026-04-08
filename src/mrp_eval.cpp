@@ -460,17 +460,21 @@ void selectCommand(args::Subparser& parser) {
             const double logLikelihood = cost(paramVector.data());
             likelihoods.push_back(logLikelihood);
         } else {
+            user_exc_check(resultFile.size() > 4, "Invalid filename: " << resultFile);
             // Load the likelihood values from the CSV (take the 0'th parameter)
             // The number of likelihood values should match the # of coal matrices in the JSON
             // Compute all metrics and add to a list
             std::stringstream ssCsvFile;
             ssCsvFile << resultFile.substr(0, resultFile.size() - 4) << "bootstrap.csv";
             std::ifstream csvFile(ssCsvFile.str());
+            user_exc_check(csvFile.good(), "Cannot read bootstrap file " << ssCsvFile.str());
             likelihoods = loadNegLL(csvFile);
             // We have negative log-likelihoods, convert to log-likelihoods
             for (size_t i = 0; i < likelihoods.size(); i++) {
                 likelihoods[i] = -likelihoods[i];
             }
+            user_exc_check(likelihoods.size() == numSamples,
+                           "Bootstrap file " << ssCsvFile.str() << " has too few results: " << likelihoods.size());
         }
         RELEASE_ASSERT(likelihoods.size() == numSamples);
 

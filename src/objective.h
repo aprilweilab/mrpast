@@ -43,6 +43,11 @@ static constexpr double EPOCH_TIME_RESCALE = 1e-6;
 // should always be noticeable enough to prevent these scenarios (hopefully).
 static constexpr double ADMIXTURE_PENALTY = 100000;
 
+// Number of times the solver will restart if it encounters NaN for a likelihood value. The
+// restart uses a new random initialization vector that is deterministic based on the original
+// initialization vector.
+static constexpr size_t DEFAULT_RESTARTS = 10;
+
 // How we should treat the observed data (coal matrices).
 enum ObservationMode {
     OBS_MODE_UNSPECIFIED = 0,
@@ -385,5 +390,11 @@ private:
     const bool m_maximization;
     ObservationMode m_mode;
 };
+
+// Set the random seed that is used for parameter initialization.
+void setRandSeed(uint64_t seed);
+// Set the random seed that is used for parameter initialization to the current time
+// (less deterministic randomness)
+void setRandSeedToTime();
 
 #endif /* MRP_SOLVER_OBJECTIVE_H */

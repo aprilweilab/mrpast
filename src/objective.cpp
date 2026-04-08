@@ -50,9 +50,14 @@ using Eigen::VectorXd;
 #define TRACELN(msg)
 #endif
 
+static uint64_t randSeed = 0;
+
+void setRandSeed(const uint64_t seed) { randSeed = seed; }
+
+void setRandSeedToTime() { randSeed = std::chrono::system_clock::now().time_since_epoch().count(); }
+
 double randDouble(const double lower, const double upper) {
-    static unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    static std::default_random_engine generator(seed);
+    static std::default_random_engine generator(randSeed);
     std::uniform_real_distribution<double> sampler(lower, upper);
     return sampler(generator);
 }
