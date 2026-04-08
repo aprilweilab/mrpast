@@ -53,6 +53,11 @@ int main(int argc, char** argv) {
         {'t', "timeout"});
     args::Flag randomInit(
         parser, "randomInit", "Ignore the initial values in the input file and randomize them", {'r', "random-init"});
+    args::ValueFlag<size_t> randomRestarts(
+        parser,
+        "randomRestart",
+        "If the init value results in negLL=NaN, restart with a different init value this many times (deterministic).",
+        {"random-restarts"});
     args::ValueFlag<size_t> selectMatrix(parser,
                                          "selectMatrix",
                                          "Select a specific coal matrix from the list of matrices in the input JSON.",
@@ -88,6 +93,7 @@ int main(int argc, char** argv) {
 
     std::vector<double> paramVector(cost.m_schema.totalParams());
     if (randomInit) {
+        setRandSeedToTime();
         cost.m_schema.randomParamVector(paramVector.data());
     } else {
         cost.m_schema.initParamVector(paramVector.data());
@@ -98,7 +104,30 @@ int main(int argc, char** argv) {
     std::cerr << std::endl;
 
     const double timeoutSec = timeout ? *timeout : DEFAULT_TIMEOUT_SECONDS;
-    const double minf = solve(cost, paramVector, MRP_OPT_ALG, true, timeoutSec);
+    const size_t maxRestarts = randomRestarts ? *randomRestarts : DEFAULT_RESTARTS;
+    double minf = std::numeric_limits<double>::quiet_NaN();
+    size_t restarts = 0;
+    do {
+        minf = solve(cost, paramVector, MRP_OPT_ALG, true, timeoutSec);
+        if (std::isnan(minf)) {
+            // For our first restart, initialize the seed to the integer sum of all parameters.
+            if (restarts == 0) {
+                uint64_t seed = 0;
+                for (const double v : paramVector) {
+                    seed += (uint64_t)(v * 1001001001); // Multiply by a big number so we don't just get 0 for int
+                }
+                setRandSeed(seed);
+            }
+            cost.m_schema.randomParamVector(paramVector.data());
+            restarts++;
+            std::cerr << "Restarting solver due to NaN (" << restarts << "/" << maxRestarts << ")" << std::endl;
+        }
+    } while (std::isnan(minf) && restarts <= maxRestarts);
+
+    // Don't let the solver silently return NaN to the Python code.
+    user_exc_check(!std::isnan(minf),
+                   "Likelihood is NaN after "
+                       << restarts << " restarts; your model may be problematic (try restricting the bounds more)");
 
     if (*outfile != std::string("-")) {
         std::ofstream outputData(*outfile);

@@ -26,6 +26,7 @@ import glob
 import json
 import os
 import pandas as pd
+import random
 import re
 import subprocess
 import sys
@@ -1105,6 +1106,7 @@ def main():
 
         leave_out = parse_intlist(args.leave_out)
 
+        random.seed(args.seed)
         try:
             process_ARGs(
                 args.model,
@@ -1280,6 +1282,7 @@ def main():
                 )
                 exit(2)
             os.mkdir(out_dir)
+            random.seed(args.seed)
             with open(args.solved_result) as f:
                 base_input = ModelSolverInput.from_json(f.read())
             if args.replicates is not None:
@@ -1349,8 +1352,9 @@ def main():
                 file=sys.stderr,
             )
             exit(1)
-        result = subprocess.check_output(cmd + args.solved_results)
-        print(result)
+        result = subprocess.check_output(cmd + args.solved_results).decode("utf-8")
+        result = json.loads(result)
+        print(json.dumps(result, indent=2))
     else:
         parser.print_help()
         exit(1)
