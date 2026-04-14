@@ -48,6 +48,14 @@ def _param_is_constructed(parameter: Dict[str, Any]) -> bool:
     return len(parameter.get("one_minus", [])) > 0
 
 
+def _clamp(param, value):
+    if value < param["lb"]:
+        return param["lb"]
+    if value > param["ub"]:
+        return param["ub"]
+    return value
+
+
 def load_json_pandas(
     filename: str, interval_field: Optional[str] = None, skip_fixed: bool = True
 ) -> pd.DataFrame:
@@ -69,13 +77,6 @@ def load_json_pandas(
         data = json.load(f)
     ploidy = data["ploidy"]
 
-    def clamp(param, value):
-        if value < param["lb"]:
-            return param["lb"]
-        if value > param["ub"]:
-            return param["ub"]
-        return value
-
     def get_interval(param, idx):
         if interval_field is not None and not (
             _param_is_fixed(param) or _param_is_constructed(param)
@@ -87,7 +88,7 @@ def load_json_pandas(
 
     epochs = data.get("epoch_times_gen")
     for i, p in enumerate(epochs if epochs else []):
-        v = clamp(p, p["final"])
+        v = _clamp(p, p["final"])
         del p["apply_to"]
         is_fixed = _param_is_fixed(p)
         if is_fixed and skip_fixed:
@@ -95,9 +96,9 @@ def load_json_pandas(
         p.update(
             {
                 "label": f"E{i}",
-                "Ground Truth": clamp(p, p["ground_truth"]),
-                "err_low": v - clamp(p, get_interval(p, 0)),
-                "err_hi": clamp(p, get_interval(p, 1)) - v,
+                "Ground Truth": _clamp(p, p["ground_truth"]),
+                "err_low": v - _clamp(p, get_interval(p, 0)),
+                "err_hi": _clamp(p, get_interval(p, 1)) - v,
                 "Optimized Value": v,
                 "Parameter Type": "Epoch time",
                 "Fixed": is_fixed,
@@ -112,15 +113,15 @@ def load_json_pandas(
         if is_fixed and skip_fixed:
             continue
         if p["kind"] == "migration":
-            v = clamp(p, p["final"])
+            v = _clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
             p.update(
                 {
                     "label": f"M{mcounter}",
-                    "Ground Truth": clamp(p, p["ground_truth"]),
-                    "err_low": v - clamp(p, get_interval(p, 0)),
-                    "err_hi": clamp(p, get_interval(p, 1)) - v,
+                    "Ground Truth": _clamp(p, p["ground_truth"]),
+                    "err_low": v - _clamp(p, get_interval(p, 0)),
+                    "err_hi": _clamp(p, get_interval(p, 1)) - v,
                     "Optimized Value": v,
                     "Parameter Type": "Migration rate",
                     "Epochs": epochs,
@@ -130,15 +131,15 @@ def load_json_pandas(
             result.append(p)
             mcounter += 1
         elif p["kind"] == "growth":
-            v = clamp(p, p["final"])
+            v = _clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
             p.update(
                 {
                     "label": f"G{gcounter}",
-                    "Ground Truth": clamp(p, p["ground_truth"]),
-                    "err_low": v - clamp(p, get_interval(p, 0)),
-                    "err_hi": clamp(p, get_interval(p, 1)) - v,
+                    "Ground Truth": _clamp(p, p["ground_truth"]),
+                    "err_low": v - _clamp(p, get_interval(p, 0)),
+                    "err_hi": _clamp(p, get_interval(p, 1)) - v,
                     "Optimized Value": v,
                     "Parameter Type": "Growth rate",
                     "Epochs": epochs,
@@ -150,7 +151,7 @@ def load_json_pandas(
         elif p["kind"] == "coalescence":
 
             def coal2ne(rate):
-                return 1 / (ploidy * clamp(p, rate))
+                return 1 / (ploidy * _clamp(p, rate))
 
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
@@ -173,7 +174,7 @@ def load_json_pandas(
             result.append(p)
             ncounter += 1
     for acounter, p in enumerate(data.get("amatrix_parameters", []) or []):
-        v = clamp(p, p["final"])
+        v = _clamp(p, p["final"])
         del p["apply_to"]
         is_fixed = _param_is_fixed(p)
         if is_fixed and skip_fixed:
@@ -182,10 +183,10 @@ def load_json_pandas(
             {
                 "label": f"A{acounter}",
                 "Ground Truth": (
-                    clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+                    _clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
                 ),
-                "err_low": v - clamp(p, get_interval(p, 0)),
-                "err_hi": clamp(p, get_interval(p, 1)) - v,
+                "err_low": v - _clamp(p, get_interval(p, 0)),
+                "err_hi": _clamp(p, get_interval(p, 1)) - v,
                 "Optimized Value": v,
                 "Parameter Type": "Admixture proportion",
                 "Epochs": [],  # TODO
@@ -466,7 +467,7 @@ def get_matching_colors(num_demes, demes=[]):
     }
 
 
-def tab_show(filename: str, sort_by: str = "Index"):
+def tab_show(filename: str, sort_by: str = "Index", show_popsize: bool = False):
     """
     Print an ASCII table showing the parameter values and their error from ground truth, for the
     given JSON output from the solver.
@@ -480,6 +481,11 @@ def tab_show(filename: str, sort_by: str = "Index"):
         "amatrix_parameters",
     )
 
+    ploidy = output["ploidy"]
+
+    def coal2ne(param, rate):
+        return 1 / (ploidy * _clamp(param, rate))
+
     all_params: Iterable[Dict[str, Any]] = itertools.chain.from_iterable(
         map(lambda k: output.get(k, []) or [], parameter_keys)
     )
@@ -491,6 +497,12 @@ def tab_show(filename: str, sort_by: str = "Index"):
             continue
         gt = param["ground_truth"]
         final = param["final"]
+        description = param["description"]
+
+        if show_popsize and param["kind"] == "coalescence":
+            gt = coal2ne(param, gt)
+            final = coal2ne(param, final)
+            description = description.replace("Coalescence rate", "Ne")
         abserr = abs(gt - final)
         total_abs += abserr
         relerr = abserr / gt
@@ -501,7 +513,7 @@ def tab_show(filename: str, sort_by: str = "Index"):
         results.append(
             (
                 param_idx,
-                param["description"],
+                description,
                 relerr,
                 abserr,
                 gt,
