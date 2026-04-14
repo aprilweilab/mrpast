@@ -31,6 +31,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "nlopt.h"
 #include "objective.h"
 #include "solve.h"
 
@@ -139,6 +140,9 @@ double solve(NegLogLikelihoodCostFunctor& cost,
     cost.resetSolveStats();
     try {
         nlopt_result result = nlopt_optimize(opt, paramVector.data(), &minf);
+        if (result == NLOPT_MAXTIME_REACHED) {
+            std::cerr << "**WARNING: Solver reached timeout; result may not be a true minima**" << std::endl;
+        }
         if (verbose) {
             std::cerr << "total calls: " << cost.m_numObjCalls << std::endl;
             std::cerr << "found minimum at f(";
