@@ -1064,6 +1064,12 @@ def main():
     show_parser.add_argument(
         "--sort-by", "-s", default="Index", help="Sort parameters by the column name."
     )
+    show_parser.add_argument(
+        "--show-ne",
+        "-n",
+        action="store_true",
+        help="Convert coalescence rates to Ne (effective population sizes).",
+    )
 
     select_parser = subparsers.add_parser(CMD_SELECT, help="AIC-based model selection.")
     select_parser.add_argument(
@@ -1349,7 +1355,7 @@ def main():
             df = pd.read_csv(args.solved_result)
             print(df)
         else:
-            tab_show(args.solved_result, args.sort_by)
+            tab_show(args.solved_result, args.sort_by, args.show_ne)
     elif args.command == CMD_SELECT:
         cmd = [eval_exe, "select"]
         if args.bootstrap:
