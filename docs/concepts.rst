@@ -170,3 +170,24 @@ that you want to use. A few examples are:
 2. You inferred an ARG containing 4 populations, but you want to use a model that contains another (5th) population. Here, you need to treat one of these populations as unsampled and use the ``--map-pops`` option to specify how the ARG populations map to model populations.
 
 See the `examples <examples.html>`_ page for more details.
+
+Population Growth
+-----------------
+
+For models that involve population growth, such that at the start of epoch :math:`E` there is a coalescence rate
+:math:`r_1` and throughout the epoch there is a growth rate :math:`g`, then at the end of :math:`E` (at time :math:`T_1`)
+we know the coalescence rate should be :math:`r_1 \times e^{g T_1}``. However, sometimes it is beneficial
+to model an instantaneous change of rate at time :math:`T_1` (for example, in the
+`OutOfAfrica_3G09 <https://popsim-consortium.github.io/stdpopsim-docs/stable/catalog.html#sec_catalog_homsap_models_outofafrica_3g09>`_
+model). The difference between these two modeling approaches can be seen in `1t12.yaml <https://github.com/aprilweilab/mrpast/blob/main/examples/1t12.yaml>`_
+and `1t12.gr.yaml <https://github.com/aprilweilab/mrpast/blob/main/examples/1t12.gr.yaml>`_ which model the same
+thing, except the former has an "extra" coalescence rate parameter to capture potential instantaneous rates of change.
+
+When working with simulated data, using the calculated rate (via the ``previous`` keyword) is often more accurate,
+because the model and data match up exactly. However this requires that the growth rate parameter was accurately
+estimated by ``mrpast``, which can sometimes require the use of extra time slices.
+
+The general recommendation is to try modeling both ways, and compare the results. If, on real or simulated data,
+the two models mostly agree then the calculated rate model (using ``previous`` keyword) may result in
+more accurate parameter estimates. If the two models disagree noticeably, then either the model itself doesn't
+well match the data, or ``mrpast`` could be having difficult estimating an accurate growth rate.

@@ -24,9 +24,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from dataclasses_json import dataclass_json
 from enum import Enum
-import random
 import json
 import os
+import random
+import sys
 
 DEFAULT_PLOIDY = 2
 
@@ -48,8 +49,16 @@ class ParameterKind(str, Enum):
     PARAM_KIND_EPOCH = "epoch"
 
 
-class TimeSliceAdjustment(str, Enum):
-    GROWTH_RATE = "growth_rate"
+class ParameterAdjustment(str, Enum):
+    GROWTH_RATE = (
+        "growth_rate"  # Adjust the coalescence rate based on a growth rate parameter.
+    )
+
+
+# Special parameter index value that means "copy the previous Ne value"
+INDEX_COPY_PREVIOUS = -2
+# String value for the same thing
+STRING_COPY_PREVIOUS = "previous"
 
 
 @dataclass_json
@@ -78,7 +87,8 @@ class VariableApplication:
     i: int
     j: int
     coeff: float
-    adjustment: Optional[TimeSliceAdjustment] = None
+    adjustment: Optional[ParameterAdjustment] = None
+    copy_previous_ne: bool = False
 
 
 @dataclass_json
@@ -238,7 +248,7 @@ class DemeDemeEntry(ResolveableEntry):
 class DemeRateEntry(ResolveableEntry):
     epoch: int
     deme: Union[int, str]
-    rate: Union[float, ParamRef]
+    rate: Union[float, ParamRef, str]
 
     def resolve_names(self, name2index: Dict[str, int]):
         if isinstance(self.deme, str):
@@ -307,6 +317,13 @@ class DemeDemeRates(ParamContainer):
             max(list(map(lambda e: int(e.dest), self.entries)) + [0]),
         )
 
+    # Does the given deme show up as a source or destination for the given epoch?
+    def contains(self, deme: int, epoch: int) -> bool:
+        for e in self.entries:
+            if e.epoch == epoch and (e.source == deme or e.dest == deme):
+                return True
+        return False
+
     def get_entry(self, epoch: int, source: int, dest: int) -> Optional[DemeDemeEntry]:
         for e in self.entries:
             if e.epoch == epoch and e.source == source and e.dest == dest:
@@ -317,6 +334,9 @@ class DemeDemeRates(ParamContainer):
         entry = self.get_entry(epoch, source, dest)
         if entry is None:
             return None
+        assert (
+            entry.rate != STRING_COPY_PREVIOUS
+        ), "Value of 'previous' not supported for parameter type"
         if isinstance(entry.rate, ParamRef):
             return self.get_parameter(entry.rate.param).ground_truth
         return float(entry.rate)
@@ -330,6 +350,9 @@ class DemeDemeRates(ParamContainer):
         entry = self.get_entry(epoch, source, dest)
         if entry is None:
             return (None, None)
+        assert (
+            entry.rate != STRING_COPY_PREVIOUS
+        ), "Value of 'previous' not supported for parameter type"
         if isinstance(entry.rate, ParamRef):
             return (entry.rate.param, None)
         return (None, float(entry.rate))
@@ -364,6 +387,9 @@ class DemeRates(ParamContainer):
         entry = self.get_entry(epoch, deme)
         if entry is None:
             return None
+        if entry.rate == STRING_COPY_PREVIOUS:
+            assert epoch > 0, "Value of 'previous' not supported for epoch 0"
+            return entry.rate
         if isinstance(entry.rate, ParamRef):
             return self.get_parameter(entry.rate.param).ground_truth
         return float(entry.rate)
@@ -377,6 +403,8 @@ class DemeRates(ParamContainer):
         entry = self.get_entry(epoch, deme)
         if entry is None:
             return (None, None)
+        if entry.rate == STRING_COPY_PREVIOUS:
+            return (INDEX_COPY_PREVIOUS, None)
         if isinstance(entry.rate, ParamRef):
             return (entry.rate.param, None)
         return (None, float(entry.rate))
@@ -433,6 +461,10 @@ class AdmixtureGroup(ParamContainer):
         return ParamContainer._from_config(config_entry, AdmixtureEntry, AdmixtureGroup)
 
 
+def _almost_equal(a, b, tolerance=1e-4):
+    return abs(a - b) <= tolerance
+
+
 @dataclass
 class UserModel:
     ploidy: int
@@ -444,11 +476,95 @@ class UserModel:
     growth: DemeRates
     admixture: AdmixtureGroup
 
-    # TODO: validation
-    # 1. admixture proportions should sum to 1 (all const or all symbolic)
-    # 2. admixture epochs >= 1 (cannot do "after" epoch 0)
-    # 3. admixture source != dest
-    # 4. epoch/demes counts < num pops / epochs
+    def validate(self):
+        # Validation
+        nepoch = self.epochs.num_epochs
+        assert (
+            self.ploidy >= 1 and self.ploidy <= 8
+        ), f"Unexpected ploidy value of {self.ploidy}"
+        assert (
+            self.migration.max_deme < self.pop_count
+        ), f"Migration entries reference a deme {self.migration.max_deme} that exceeds number of populations {self.pop_count}"
+        assert (
+            self.migration.max_epoch < nepoch
+        ), f"Migration entries reference an epoch {self.migration.max_epoch} that exceeds number of populations {nepoch}"
+        assert (
+            self.coalescence.max_deme < self.pop_count
+        ), f"Coalescence entries reference a deme {self.coalescence.max_deme} that exceeds number of populations {self.pop_count}"
+        assert (
+            self.coalescence.max_epoch < nepoch
+        ), f"Coalescence entries reference an epoch {self.coalescence.max_epoch} that exceeds number of populations {nepoch}"
+        assert (
+            self.growth.max_deme < self.pop_count
+        ), f"Growth entries reference a deme {self.growth.max_deme} that exceeds number of populations {self.pop_count}"
+        assert (
+            self.growth.max_epoch < nepoch
+        ), f"Growth entries reference an epoch {self.growth.max_epoch} that exceeds number of populations {nepoch}"
+
+        # Admixture constraints
+        types_seen = defaultdict(set)
+        admix_by_deme_epoch = defaultdict(int)
+        for entry in self.admixture.entries:
+            assert (
+                entry.ancestral != entry.derived
+            ), "Invalid admixture entry: ancestral cannot equal derived"
+            assert (
+                entry.epoch > 0
+            ), "Admixture cannot be defined for epoch 0; admixture occurs at the end (most recent time) of an epoch"
+            if isinstance(entry.proportion, ParamRef):
+                types_seen[entry.epoch].add("param")
+                param = self.admixture.get_parameter(entry.proportion.param)
+                admix_by_deme_epoch[(entry.derived, entry.epoch)] += param.ground_truth
+            else:
+                assert isinstance(entry.proportion, float) or isinstance(
+                    entry.proportion, int
+                )
+                types_seen[entry.epoch].add("const")
+                admix_by_deme_epoch[(entry.derived, entry.epoch)] += entry.proportion
+        for epoch, typ in types_seen.items():
+            if len(typ) > 1:
+                assert (
+                    False
+                ), f"Cannot mix constant and parameterized admixtures (epoch {epoch})"
+        for (deme, epoch), suma in admix_by_deme_epoch.items():
+            assert _almost_equal(
+                suma, 1
+            ), f"Admixtures values or ground_truth must sum to 1 (epoch {epoch}, deme={deme})"
+
+        def _validate_value(v, name, supports_previous=False):
+            supported_set = set()
+            if supports_previous:
+                supported_set.add(STRING_COPY_PREVIOUS)
+            if isinstance(v, str):
+                if v not in supported_set:
+                    raise RuntimeError(
+                        f"String value '{v}' not supported for {name} entries"
+                    )
+            else:
+                assert (
+                    isinstance(v, float)
+                    or isinstance(v, int)
+                    or isinstance(v, ParamRef)
+                ), f"Invalid value for {name}: {v}"
+
+        list(
+            map(
+                lambda e: _validate_value(
+                    e.rate, "coalescence", supports_previous=True
+                ),
+                self.coalescence.entries,
+            )
+        )
+        list(map(lambda e: _validate_value(e.rate, "growth"), self.growth.entries))
+        list(
+            map(lambda e: _validate_value(e.rate, "migration"), self.migration.entries)
+        )
+        list(
+            map(
+                lambda e: _validate_value(e.proportion, "admixture"),
+                self.admixture.entries,
+            )
+        )
 
     @staticmethod
     def from_file(filename: str) -> "UserModel":
@@ -482,30 +598,7 @@ class UserModel:
             admixture=admixture,
         )
         result.resolve_names()
-
-        # Validation
-        nepoch = result.epochs.num_epochs
-        assert (
-            result.ploidy >= 1 and result.ploidy <= 8
-        ), f"Unexpected ploidy value of {result.ploidy}"
-        assert (
-            result.migration.max_deme < result.pop_count
-        ), f"Migration entries reference a deme {result.migration.max_deme} that exceeds number of populations {pop_count}"
-        assert (
-            result.migration.max_epoch < nepoch
-        ), f"Migration entries reference an epoch {result.migration.max_epoch} that exceeds number of populations {nepoch}"
-        assert (
-            result.coalescence.max_deme < pop_count
-        ), f"Coalescence entries reference a deme {result.coalescence.max_deme} that exceeds number of populations {pop_count}"
-        assert (
-            result.coalescence.max_epoch < nepoch
-        ), f"Coalescence entries reference an epoch {result.coalescence.max_epoch} that exceeds number of populations {nepoch}"
-        assert (
-            result.growth.max_deme < pop_count
-        ), f"Growth entries reference a deme {result.growth.max_deme} that exceeds number of populations {pop_count}"
-        assert (
-            result.growth.max_epoch < nepoch
-        ), f"Growth entries reference an epoch {result.growth.max_epoch} that exceeds number of populations {nepoch}"
+        result.validate()
 
         return result
 
@@ -591,6 +684,9 @@ def construct_stoch_matrix(
             if notnone(m_index, m_value):
                 assert i != j, f"Migration to self is not allowed (deme {i})"
                 if m_index is not None:
+                    assert (
+                        m_index != INDEX_COPY_PREVIOUS
+                    ), "'previous' is not supported/needed for migration rates"
                     # Migration rate is a variable to be optimized. The actual stochastic state transition rates
                     # are derived from these by a linear combination.
                     if m_index not in M_parameters:
@@ -634,18 +730,36 @@ def construct_stoch_matrix(
     for i in range(model.num_demes):
         c_index, c_value = model.coalescence.get_index_or_value(epoch, i)
         if notnone(c_index, c_value):
+            # Coalescence state can only be reached from the state where both individuals are in the same deme.
+            from_idx = deme_pair_index[i, i]
+
+            copy_previous_ne = False
             if c_index is not None:
                 # Coalescence rate is a variable to be optimized. The actual stochastic state transition rates
                 # are derived from these by a linear combination.
-                if c_index not in Q_parameters:
-                    Q_parameters[c_index] = BoundedVariable.from_float_parameter(
-                        model.coalescence.get_parameter(c_index),
+                if c_index == INDEX_COPY_PREVIOUS:
+                    # Create the (FIXED) parameter that is a holding place for this copied result. Since it is
+                    # fixed (constant), it will be properly ignored by all the solver code, except for the
+                    # adjustment (below).
+                    coalesce_boundedvar = BoundedVariable.from_float_value(
+                        0,
                         ParameterKind.PARAM_KIND_COAL,
                         int(c_index),
-                        not init_from_ground_truth,
                         desc=f"Coalescence rate for deme {model.pop_names[i]}",
                     )
-                coalesce_boundedvar = Q_parameters[c_index]
+                    fixed_coal_params.append(coalesce_boundedvar)
+                    copy_previous_ne = True
+                else:
+                    if c_index not in Q_parameters:
+                        assert c_index >= 0
+                        Q_parameters[c_index] = BoundedVariable.from_float_parameter(
+                            model.coalescence.get_parameter(c_index),
+                            ParameterKind.PARAM_KIND_COAL,
+                            int(c_index),
+                            not init_from_ground_truth,
+                            desc=f"Coalescence rate for deme {model.pop_names[i]}",
+                        )
+                    coalesce_boundedvar = Q_parameters[c_index]
             else:
                 assert c_value is not None
                 coalesce_boundedvar = BoundedVariable.from_float_value(
@@ -656,11 +770,15 @@ def construct_stoch_matrix(
                 )
                 fixed_coal_params.append(coalesce_boundedvar)
 
-            # Coalescence state can only be reached from the state where both individuals are in the same deme.
-            from_idx = deme_pair_index[i, i]
             # Case: they do coalesce, which moves to the "final" state (last column)
             coalesce_boundedvar.apply_to.append(
-                VariableApplication(i=from_idx, j=nstates, coeff=1, epoch=epoch)
+                VariableApplication(
+                    i=from_idx,
+                    j=nstates,
+                    coeff=1,
+                    epoch=epoch,
+                    copy_previous_ne=copy_previous_ne,
+                )
             )
 
             # Optional growth-rate adjustment the coalescent rate. At discretized time t, the adjustment
@@ -668,6 +786,9 @@ def construct_stoch_matrix(
             g_index, g_value = model.growth.get_index_or_value(epoch, i)
             if notnone(g_index, g_value):
                 if g_index is not None:
+                    assert (
+                        g_index != INDEX_COPY_PREVIOUS
+                    ), "'previous' is not supported/needed for growth rates"
                     if g_index not in G_parameters:
                         G_parameters[g_index] = BoundedVariable.from_float_parameter(
                             model.growth.get_parameter(g_index),
@@ -686,15 +807,15 @@ def construct_stoch_matrix(
                         desc=f"Fixed growth rate for deme {model.pop_names[i]}",
                     )
                     fixed_grow_params.append(growth_boundedvar)
-                # We apply the growth to both the "coalescence" and "stay put" cases, because they should be
-                # symmetric for the Q-matrix to work properly.
+                # We apply the growth adjustment to the "coalescence" case: transition from the current state
+                # to the coalescence state (nstates)
                 growth_boundedvar.apply_to.append(
                     VariableApplication(
                         i=from_idx,
                         j=nstates,
                         coeff=1,
                         epoch=epoch,
-                        adjustment=TimeSliceAdjustment.GROWTH_RATE,
+                        adjustment=ParameterAdjustment.GROWTH_RATE,
                     )
                 )
 
@@ -768,6 +889,9 @@ def construct_admixture(model: UserModel, init_from_ground_truth: bool):
                 _, entry = by_derived[i][0]
                 index, value = entry.get_index_or_value()
                 if index is not None:
+                    assert (
+                        index != INDEX_COPY_PREVIOUS
+                    ), "'previous' is not supported/needed for admixture"
                     a_param = model.admixture.get_parameter(index)
                     assert (
                         a_param.is_const
@@ -1034,20 +1158,37 @@ def copy_model_with_outputs(
 
 def print_model_warnings(model_filename: str):
     model = UserModel.from_file(model_filename)
+    # Check overlapping epoch time bounds.
     last_ub = 0.0
     for i, et in enumerate(model.epochs.epoch_times):
         if et.lb < last_ub:
             print(
                 f"WARNING: Time between epochs {i} and {i+1} has overlapping bounds with the previous epoch. "
                 "This can cause problems where the solver picks out of order epoch times. Consider setting "
-                "bounds so that the time axis is partitioned among the epoch parameters."
+                "bounds so that the time axis is partitioned among the epoch parameters.",
+                file=sys.stderr,
             )
         last_ub = et.ub
+    # Check too small of an Ne (implied by coal rates)
     min_suggested_ne = 250
     for i, param in enumerate(model.coalescence.parameters):
         if param.ground_truth >= (1 / (model.ploidy * min_suggested_ne)):
             print(
-                f"WARNING: Coalescence rate parameter {i} results in an Ne less than the suggested minimum ({min_suggested_ne})"
+                f"WARNING: Coalescence rate parameter {i} results in an Ne less than the suggested minimum ({min_suggested_ne})",
+                file=sys.stderr,
+            )
+    # Check for the use of "previous" in a deme/epoch that has migration. This can work quite well, but
+    # it can also be less robust than having a separate calculated Ne parameter.
+    for param in model.coalescence.entries:
+        if param.rate == STRING_COPY_PREVIOUS and model.migration.contains(
+            param.deme, param.epoch
+        ):
+            print(
+                f"WARNING: Coalescence rate for deme={param.deme}, epoch={param.epoch} is computed from the previous epoch. "
+                "This deme also has migration during this epoch. When the model matches the data very closely, this works "
+                "quite well. Otherwise this type of model can be less stable. It is recommended to test both with and without "
+                "the computed rate (by adding another coalescence rate parameter) to ensure the results are robust.",
+                file=sys.stderr,
             )
 
 

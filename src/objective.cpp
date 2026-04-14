@@ -200,7 +200,8 @@ void ParameterSchema::load(const json& inputData) {
             if (!adjustmentJson.is_null()) {
                 adjust = parse_adjust(adjustmentJson);
             }
-            applications.push_back({app["coeff"], i, j, epoch, adjust});
+            const bool copyPrev = app.value("copy_previous_ne", false);
+            applications.push_back({app["coeff"], i, j, epoch, adjust, copyPrev});
         }
         const double ground_truth = getGroundTruth(parameter);
         BoundedVariable bv = {parameter["init"],
@@ -422,15 +423,23 @@ void ParameterSchema::fromJsonOutput(const json& jsonOutput, double* parameters,
  * epoch, produce the concrete infinitesimal rate matrix based on the mappings in this
  * schema.
  */
-MatrixXd
-createQMatrix(const ParameterSchema& schema, double const* parameters, size_t epoch, const double timeSinceEpochStart) {
+MatrixXd createQMatrix(const ParameterSchema& schema,
+                       double const* parameters,
+                       size_t epoch,
+                       const double timeSinceEpochStart,
+                       const std::vector<double>& previousNeValues,
+                       std::vector<double>& finalNeValues) {
     assert(epoch < schema.numEpochs());
 
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch));
+    assert(previousNeValues.size() == nStates);
+    assert(previousNeValues.size() == finalNeValues.size());
     // Skip this many epoch transition times.
     const size_t firstParamIdx = schema.m_eParamIdx.size();
     MatrixXd qMatrix = MatrixXd::Zero(nStates, nStates);
 
+    // XXX This (JSON) solver interface has become a bit overly complex, because we have so
+    // many different scenarios now. We should find a better way interface between model and solver.
     auto applyParameter =
         [&](const std::vector<VariableApplication>& applications, const double parameterValue, bool& anyAdjusted) {
             for (const auto& application : applications) {
@@ -445,12 +454,15 @@ createQMatrix(const ParameterSchema& schema, double const* parameters, size_t ep
                         const double integratedRate = (std::exp(parameterValue * timeSinceEpochStart) - 1) /
                                                       (parameterValue * timeSinceEpochStart);
                         qMatrix(i, j) = origRate * integratedRate * application.coeff;
+                        finalNeValues.at(i) = origRate * std::exp(parameterValue * timeSinceEpochStart);
                         anyAdjusted = true;
-                    } else if (application.adjust == ADJUST_INV_GROWTH_RATE) {
-                        // For backwards compatibility with JSON input files. Just ignore.
                     } else {
-                        qMatrix(i, j) += parameterValue * application.coeff;
                         assert(!anyAdjusted);
+                        if (application.copyPreviousNe) {
+                            qMatrix(i, j) = previousNeValues.at(i);
+                        } else {
+                            qMatrix(i, j) += parameterValue * application.coeff;
+                        }
                     }
                 }
             }
@@ -648,12 +660,15 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
     size_t currentEpoch = 0;
     Eigen::Index currentSlice = 0;
     double epochStart = 0;
+    std::vector<double> prevEpochNeValues(nStatesEpoch0);
+    std::vector<double> nextEpochNeValues(nStatesEpoch0);
     for (size_t i = 0; i < allTimes.size(); i++) {
         const double time = allTimes[i].time;
         const size_t newEpoch = allTimes[i].epoch;
         const double deltaT = time - epochStart;
 
-        const MatrixXd curMatrix = std::move(createQMatrix(schema, parameters, currentEpoch, deltaT));
+        const MatrixXd curMatrix =
+            std::move(createQMatrix(schema, parameters, currentEpoch, deltaT, prevEpochNeValues, nextEpochNeValues));
         if (qMatricesByTime != nullptr) {
             qMatricesByTime->emplace_back(time, curMatrix);
         }
@@ -717,6 +732,8 @@ MatrixXd modelPMFByTimeWithEpochs(const ParameterSchema& schema,
 
             epochStart = time;
             currentEpoch = newEpoch;
+            prevEpochNeValues = std::move(nextEpochNeValues);
+            nextEpochNeValues = std::vector<double>(nStatesEpoch0);
         }
     }
     // If the solver pushes an epoch time into the last time slice, it will just be 1-p, and

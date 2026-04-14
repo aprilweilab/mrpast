@@ -3,16 +3,20 @@ from mrpast.simulate import build_demography
 from mrpast.from_demes import convert_from_demes
 from mrpast.helpers import dump_model_yaml
 import demes
-import unittest
-import tempfile
+import glob
 import os
+import subprocess
+import tempfile
+import unittest
 
 THISDIR = os.path.dirname(os.path.realpath(__file__))
 
-MODEL_5D1E = os.path.join(THISDIR, "..", "examples", "5deme1epoch.yaml")
-MODEL_6D2ES = os.path.join(THISDIR, "..", "examples", "6deme2epoch.split.yaml")
-MODEL_OOA2 = os.path.join(THISDIR, "..", "examples", "ooa_2t12.yaml")
-MODEL_OOA3 = os.path.join(THISDIR, "..", "examples", "ooa_3g09.yaml")
+MODEL_DIR = os.path.join(THISDIR, "..", "examples")
+
+MODEL_5D1E = os.path.join(MODEL_DIR, "5deme1epoch.yaml")
+MODEL_6D2ES = os.path.join(MODEL_DIR, "6deme2epoch.split.yaml")
+MODEL_OOA2 = os.path.join(MODEL_DIR, "ooa_2t12.yaml")
+MODEL_OOA3 = os.path.join(MODEL_DIR, "ooa_3g09.yaml")
 
 
 class ModelTests(unittest.TestCase):
@@ -96,6 +100,10 @@ class ModelTests(unittest.TestCase):
 
     def test_demes_6d2es(self):
         self.run_demes_integration(MODEL_6D2ES)
+
+    def test_all_valid(self):
+        for model_file in glob.glob(os.path.join(MODEL_DIR, "*.yaml")):
+            subprocess.check_call(["mrpast", "model", model_file])
 
 
 if __name__ == "__main__":

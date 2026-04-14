@@ -79,7 +79,9 @@ has an ``index:`` field that specifies the unique, non-zero index it uses.
     - {"epoch": 4, "deme": "AFR", "rate": {"param": 1}}
 
 The corresponding parameters are next, and are nested within the ``coalescence`` object. Each object (``coalescence``,
-``migration``, ``growth``) has its own parameter space within which indexes must be unique.
+``migration``, ``growth``) has its own parameter space within which indexes must be unique. Instead of specifying a
+parameter for ``"rate"``, you can specify the string ``"previous"`` which will compute the given epoch's
+coalescence rate from the previous epoch.
 
 ::
 
