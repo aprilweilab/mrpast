@@ -590,6 +590,7 @@ def process_ARGs(
     left_skew_times: bool = False,
     seed: int = DEFAULT_RANDOM_SEED,
     pop_idx_map: Dict[int, int] = {},
+    solver_timeout: Optional[float] = None,
 ) -> List[str]:
     """
     Given a set of ARGs, extract the pair-wise coalescence information and turn it into a concrete
@@ -679,7 +680,7 @@ def process_ARGs(
     print(f"Created solver inputs: {solver_inputs}")
 
     if do_solve:
-        solver_outputs = solve(solver_inputs, jobs)
+        solver_outputs = solve(solver_inputs, jobs, timeout=solver_timeout)
         print(f"Created outputs: {[fn for (fn, _) in solver_outputs]}")
         best_output = process_solver_outputs(solver_outputs, verbose=True)
         print(f"The output with the highest likelihood is {best_output}")
@@ -854,6 +855,12 @@ def main():
         default=None,
         help=f"A list of <idx1>:<idx2>, comma-separated, which maps a particular population to another population, based on their "
         "0-based indices. Useful for when the ARG populations are in a different order (or not sampled) compared to the model.",
+    )
+    process_parser.add_argument(
+        "--timeout",
+        default=None,
+        type=float,
+        help="Solver timeout in seconds. Solver returns the current best result upon timeout.",
     )
 
     solve_parser = subparsers.add_parser(
@@ -1132,6 +1139,7 @@ def main():
                 left_skew_times=left_skew,
                 seed=args.seed,
                 pop_idx_map=pop_idx_map,
+                solver_timeout=args.timeout,
             )
         except UserInputError as e:
             print("", file=sys.stderr)
