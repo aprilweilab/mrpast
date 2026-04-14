@@ -17,14 +17,14 @@ from collections import defaultdict
 from tabulate import tabulate
 from tqdm import tqdm
 from multiprocessing import Pool
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Optional, Union
 import msprime
 
 from mrpast.helpers import (
     load_ratemap,
     one_file_or_one_per_chrom,
 )
-from mrpast.model import UserModel, ParamRef
+from mrpast.model import UserModel, ParamRef, STRING_COPY_PREVIOUS
 
 MAX_EPOCH = 2**32
 
@@ -51,7 +51,9 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
     # * You cannot give the population a coalescence parameter in an Epoch other than 0, unless the
     #   population has become active by that Epoch due to a migration event.
 
-    def Ne_from_coal_rate(coal_rate: float) -> float:
+    def Ne_from_coal_rate(coal_rate: Union[str, float]) -> Optional[float]:
+        if coal_rate == STRING_COPY_PREVIOUS:
+            return None
         return 1 / (user_model.ploidy * coal_rate)
 
     # Migration is thought of backwards here, and in the MrPast model. So if we
@@ -70,6 +72,7 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
             # ne = 1 / (lambda * ploidy)
             rate_value = user_model.coalescence.get_sim_value(epoch, i)
             if rate_value is not None:
+                assert rate_value != STRING_COPY_PREVIOUS
                 if epoch == 0:
                     initially_active = True
                     active_pops.append(i)
@@ -138,7 +141,8 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
                 grow_rate = user_model.growth.get_sim_value(epoch, i)
                 prev_grow_rate = user_model.growth.get_sim_value(epoch - 1, i)
                 if (
-                    prev_coal_rate != coal_rate
+                    coal_rate != STRING_COPY_PREVIOUS
+                    and prev_coal_rate != coal_rate
                     and prev_coal_rate is not None
                     and coal_rate is not None
                 ) or (grow_rate != prev_grow_rate):
@@ -146,7 +150,6 @@ def build_demography(user_model: UserModel) -> Tuple[msprime.Demography, List[in
                         size = Ne_from_coal_rate(coal_rate)
                     else:
                         size = 0
-
                     demography.add_population_parameters_change(
                         epoch_time,
                         initial_size=size,

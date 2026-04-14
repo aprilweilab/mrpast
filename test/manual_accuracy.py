@@ -70,6 +70,7 @@ def process(
     arg_prefix: str,
     reps: int = 20,
     time_slices: int = DEFAULT_TIMESLICES,
+    extra_slices: List[int] = [],
     solver_timeout: int = DEFAULT_SOLVER_TO,
 ) -> str:
     outdir = os.path.dirname(arg_prefix)
@@ -86,9 +87,15 @@ def process(
         "test",
         "--out-dir",
         outdir,
-        os.path.join(MODEL_DIR, model),
-        arg_prefix,
     ]
+    if extra_slices:
+        cmd.extend(["--time-slices", f"+{','.join(map(str, extra_slices))}"])
+    cmd.extend(
+        [
+            os.path.join(MODEL_DIR, model),
+            arg_prefix,
+        ]
+    )
     print(f"Running command: {cmd}")
     subprocess.check_call(cmd)
 
@@ -125,9 +132,10 @@ def check_abs_errors(df, max_epoch, max_migrate, max_coalrate, max_grate, max_ad
     abs_epoch_err = sum_err_by_prefix(df, "Epoch ", False)
     assert abs_epoch_err > 0
     assert abs_epoch_err <= max_epoch, df
-    abs_migrate_err = sum_err_by_prefix(df, "Migration rate ", False)
-    assert abs_migrate_err > 0
-    assert abs_migrate_err <= max_migrate, df
+    if max_migrate >= 0:
+        abs_migrate_err = sum_err_by_prefix(df, "Migration rate ", False)
+        assert abs_migrate_err > 0
+        assert abs_migrate_err <= max_migrate, df
     abs_coalrate_err = sum_err_by_prefix(df, "Coalescence rate ", False)
     assert abs_coalrate_err > 0
     assert abs_coalrate_err <= max_coalrate, df
@@ -172,7 +180,6 @@ def test_aa5_sim():
     best_result = process("aa5.yaml", arg_prefix)
     assert best_result is not None, "No best result found in solver output!"
     df = load_json_pandas(best_result)
-    df.to_csv("tmp.csv", index=False)
 
     # Check absolute errors
     check_abs_errors(
@@ -182,4 +189,24 @@ def test_aa5_sim():
         MAX_ABS_COALRATE_ERR,
         MAX_ABS_GRATE_ERR,
         MAX_ABS_ADMIX_ERR,
+    )
+
+
+def test_1t12_sim():
+    MAX_ABS_EPOCH_ERR = 60
+    MAX_ABS_COALRATE_ERR = 2e-6
+    MAX_ABS_GRATE_ERR = 0.005
+
+    arg_prefix = simulate("1t12.yaml", "test.1t12", "test_1t12")
+    best_result = process("1t12.yaml", arg_prefix, extra_slices=[50, 100, 150, 200])
+    assert best_result is not None, "No best result found in solver output!"
+    df = load_json_pandas(best_result)
+
+    # Check absolute errors
+    check_abs_errors(
+        df,
+        MAX_ABS_EPOCH_ERR,
+        -1,  # No migration
+        MAX_ABS_COALRATE_ERR,
+        MAX_ABS_GRATE_ERR,
     )
