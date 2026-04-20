@@ -21,6 +21,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <sstream>
 
 extern "C" {
 #include <nlopt.h>

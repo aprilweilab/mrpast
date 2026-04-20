@@ -90,10 +90,12 @@ def process(
     ]
     if extra_slices:
         cmd.extend(["--time-slices", f"+{','.join(map(str, extra_slices))}"])
-    cmd.extend([
-        os.path.join(MODEL_DIR, model),
-        arg_prefix,
-    ])
+    cmd.extend(
+        [
+            os.path.join(MODEL_DIR, model),
+            arg_prefix,
+        ]
+    )
     print(f"Running command: {cmd}")
     subprocess.check_call(cmd)
 
@@ -195,8 +197,7 @@ def test_1t12_sim():
     MAX_ABS_COALRATE_ERR = 2e-6
     MAX_ABS_GRATE_ERR = 0.005
 
-    #arg_prefix = simulate("1t12.yaml", "test.1t12", "test_1t12")
-    arg_prefix = "test.1t12/test_1t12"
+    arg_prefix = simulate("1t12.yaml", "test.1t12", "test_1t12")
     best_result = process("1t12.yaml", arg_prefix, extra_slices=[50, 100, 150, 200])
     assert best_result is not None, "No best result found in solver output!"
     df = load_json_pandas(best_result)
