@@ -42,6 +42,8 @@ using Eigen::VectorXd;
 // to produce slightly better point estimates with definitely better confidence intervals.
 #define FEWER_SUBTRACTIONS_PER_EPOCH 1
 
+// #define TRACE_MATRICES 1
+
 #if TRACE_MATRICES
 #define TRACE_MATRIX(m, desc) DUMP_MATRIX(m, desc)
 #define TRACELN(msg)          std::cerr << msg << std::endl;
@@ -612,7 +614,10 @@ inline std::vector<TimeMarker> combineTimeVectors(const std::vector<double>& tim
 
 static inline void rowNorm(MatrixXd& matrix) {
     for (Eigen::Index j = 0; j < matrix.rows(); j++) {
-        matrix.row(j).array() /= matrix.row(j).sum();
+        const double rowsum = matrix.row(j).sum();
+        if (rowsum != 0.0) {
+            matrix.row(j).array() /= rowsum;
+        }
     }
 }
 
