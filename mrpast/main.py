@@ -1059,6 +1059,12 @@ def main():
             f"Defaults to {DEFAULT_SOLVE_REPS_PER_EPOCH} * num_epochs."
         ),
     )
+    confidence_parser.add_argument(
+        "--timeout",
+        default=None,
+        type=float,
+        help="Solver timeout in seconds. Solver returns the current best result upon timeout.",
+    )
     add_common(confidence_parser)
 
     polarize_parser = subparsers.add_parser(CMD_POLARIZE, help="Polarize a VCF file.")
@@ -1229,12 +1235,13 @@ def main():
             ), 'Could not find demes module; try "pip install demes"'
             model = UserModel.from_file(args.model)
             demography, _ = build_demography(model)
+        if args.debug:
             print(demography.debug())
-            if args.to_demes:
-                demes_graph = demography.to_demes()
-                outfile = args.to_demes
-                demes.dump(demes_graph, outfile)
-                print(f"Wrote {outfile}")
+        if args.to_demes:
+            demes_graph = demography.to_demes()
+            outfile = args.to_demes
+            demes.dump(demes_graph, outfile)
+            print(f"Wrote {outfile}")
     elif args.command == CMD_INIT:
         if args.from_demes is not None:
             print(
@@ -1318,7 +1325,9 @@ def main():
 
             result_df = pd.DataFrame()
             samples = len(base_input.coal_count_matrices)
-            outputs_with_times = solve(inputs, args.jobs, None, list(range(samples)))
+            outputs_with_times = solve(
+                inputs, args.jobs, args.timeout, list(range(samples))
+            )
             for i in range(samples):
                 group = []
                 for out_file, _ in outputs_with_times:
