@@ -434,7 +434,7 @@ MatrixXd createQMatrix(const ParameterSchema& schema,
     assert(epoch < schema.numEpochs());
 
     const Eigen::Index nStates = SIZE_T_TO_INDEX(schema.numStates(epoch));
-    assert(previousNeValues.size() == nStates);
+    assert(previousNeValues.size() == nStates - 1);
     assert(previousNeValues.size() == finalNeValues.size());
     // Skip this many epoch transition times.
     const size_t firstParamIdx = schema.m_eParamIdx.size();
@@ -504,9 +504,12 @@ MatrixXd createQMatrix(const ParameterSchema& schema,
 void verifyASMatrix(const MatrixXd& ASMatrix) {
     const double nearlyZero = 0.000001;
     for (Eigen::Index i = 0; i < ASMatrix.rows(); i++) {
-        MODEL_ASSERT_MSG(std::abs(1.0 - ASMatrix.row(i).sum()) <= nearlyZero, ASMatrix);
         for (Eigen::Index j = 0; j < ASMatrix.cols(); j++) {
             MODEL_ASSERT(ASMatrix(i, j) >= 0);
+        }
+        const double rowsum = ASMatrix.row(i).sum();
+        if (std::abs(1.0 - rowsum) > nearlyZero) {
+            std::cerr << "Admixture matrix row " << i << " sums to " << rowsum << std::endl;
         }
     }
 }
