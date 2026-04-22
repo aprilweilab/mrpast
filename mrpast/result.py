@@ -93,15 +93,19 @@ def load_json_pandas(
         is_fixed = _param_is_fixed(p)
         if is_fixed and skip_fixed:
             continue
+        truth = _clamp(p, p["ground_truth"])
+        err_low = v - _clamp(p, get_interval(p, 0))
+        err_hi = _clamp(p, get_interval(p, 1)) - v
         p.update(
             {
                 "label": f"E{i}",
-                "Ground Truth": _clamp(p, p["ground_truth"]),
-                "err_low": v - _clamp(p, get_interval(p, 0)),
-                "err_hi": _clamp(p, get_interval(p, 1)) - v,
+                "Ground Truth": truth,
+                "err_low": err_low,
+                "err_hi": err_hi,
                 "Optimized Value": v,
                 "Parameter Type": "Epoch time",
                 "Fixed": is_fixed,
+                "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
             }
         )
         result.append(p)
@@ -116,16 +120,20 @@ def load_json_pandas(
             v = _clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
+            truth = _clamp(p, p["ground_truth"])
+            err_low = v - _clamp(p, get_interval(p, 0))
+            err_hi = _clamp(p, get_interval(p, 1)) - v
             p.update(
                 {
                     "label": f"M{mcounter}",
-                    "Ground Truth": _clamp(p, p["ground_truth"]),
-                    "err_low": v - _clamp(p, get_interval(p, 0)),
-                    "err_hi": _clamp(p, get_interval(p, 1)) - v,
+                    "Ground Truth": truth,
+                    "err_low": err_low,
+                    "err_hi": err_hi,
                     "Optimized Value": v,
                     "Parameter Type": "Migration rate",
                     "Epochs": epochs,
                     "Fixed": is_fixed,
+                    "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
                 }
             )
             result.append(p)
@@ -134,16 +142,20 @@ def load_json_pandas(
             v = _clamp(p, p["final"])
             epochs = list(sorted(set([a.get("epoch") for a in p["apply_to"]])))
             del p["apply_to"]
+            truth = _clamp(p, p["ground_truth"])
+            err_low = v - _clamp(p, get_interval(p, 0))
+            err_hi = _clamp(p, get_interval(p, 1)) - v
             p.update(
                 {
                     "label": f"G{gcounter}",
-                    "Ground Truth": _clamp(p, p["ground_truth"]),
-                    "err_low": v - _clamp(p, get_interval(p, 0)),
-                    "err_hi": _clamp(p, get_interval(p, 1)) - v,
+                    "Ground Truth": truth,
+                    "err_low": err_low,
+                    "err_hi": err_hi,
                     "Optimized Value": v,
                     "Parameter Type": "Growth rate",
                     "Epochs": epochs,
                     "Fixed": is_fixed,
+                    "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
                 }
             )
             result.append(p)
@@ -159,16 +171,20 @@ def load_json_pandas(
             # These are flipped because of coal2ne...
             lower_ci = coal2ne(get_interval(p, 1))
             upper_ci = coal2ne(get_interval(p, 0))
+            truth = coal2ne(p["ground_truth"])
+            err_low = v - lower_ci
+            err_hi = upper_ci - v
             p.update(
                 {
                     "label": f"P{ncounter}",
-                    "Ground Truth": coal2ne(p["ground_truth"]),
-                    "err_low": v - lower_ci,
-                    "err_hi": upper_ci - v,
+                    "Ground Truth": truth,
+                    "err_low": err_low,
+                    "err_hi": err_hi,
                     "Optimized Value": v,
                     "Parameter Type": "Effective popsize",
                     "Epochs": epochs,
                     "Fixed": is_fixed,
+                    "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
                 }
             )
             result.append(p)
@@ -179,18 +195,20 @@ def load_json_pandas(
         is_fixed = _param_is_fixed(p)
         if is_fixed and skip_fixed:
             continue
+        truth = _clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
+        err_low = v - _clamp(p, get_interval(p, 0))
+        err_hi = _clamp(p, get_interval(p, 1)) - v
         p.update(
             {
                 "label": f"A{acounter}",
-                "Ground Truth": (
-                    _clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
-                ),
-                "err_low": v - _clamp(p, get_interval(p, 0)),
-                "err_hi": _clamp(p, get_interval(p, 1)) - v,
+                "Ground Truth": truth,
+                "err_low": err_low,
+                "err_hi": err_hi,
                 "Optimized Value": v,
                 "Parameter Type": "Admixture proportion",
                 "Epochs": [],  # TODO
                 "Fixed": is_fixed,
+                "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
             }
         )
         if "one_minus" in p:

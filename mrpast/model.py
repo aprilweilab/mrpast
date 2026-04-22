@@ -383,12 +383,13 @@ class DemeRates(ParamContainer):
                 return e
         return None
 
-    def get_sim_value(self, epoch: int, deme: int) -> Optional[float]:
+    def get_sim_value(self, epoch: int, deme: int) -> Optional[Union[str, float]]:
         entry = self.get_entry(epoch, deme)
         if entry is None:
             return None
         if entry.rate == STRING_COPY_PREVIOUS:
             assert epoch > 0, "Value of 'previous' not supported for epoch 0"
+            assert isinstance(entry.rate, str)
             return entry.rate
         if isinstance(entry.rate, ParamRef):
             return self.get_parameter(entry.rate.param).ground_truth
@@ -1171,20 +1172,23 @@ def print_model_warnings(model_filename: str):
         last_ub = et.ub
     # Check too small of an Ne (implied by coal rates)
     min_suggested_ne = 250
-    for i, param in enumerate(model.coalescence.parameters):
-        if param.ground_truth >= (1 / (model.ploidy * min_suggested_ne)):
+    for i, coal_param in enumerate(model.coalescence.parameters):
+        if coal_param.ground_truth >= (1 / (model.ploidy * min_suggested_ne)):
             print(
                 f"WARNING: Coalescence rate parameter {i} results in an Ne less than the suggested minimum ({min_suggested_ne})",
                 file=sys.stderr,
             )
     # Check for the use of "previous" in a deme/epoch that has migration. This can work quite well, but
     # it can also be less robust than having a separate calculated Ne parameter.
-    for param in model.coalescence.entries:
-        if param.rate == STRING_COPY_PREVIOUS and model.migration.contains(
-            param.deme, param.epoch
+    for coal_entry in model.coalescence.entries:
+        assert isinstance(
+            coal_entry.deme, int
+        )  # resolve_names() must have been called already.
+        if coal_entry.rate == STRING_COPY_PREVIOUS and model.migration.contains(
+            coal_entry.deme, coal_entry.epoch
         ):
             print(
-                f"WARNING: Coalescence rate for deme={param.deme}, epoch={param.epoch} is computed from the previous epoch. "
+                f"WARNING: Coalescence rate for deme={coal_entry.deme}, epoch={coal_entry.epoch} is computed from the previous epoch. "
                 "This deme also has migration during this epoch. When the model matches the data very closely, this works "
                 "quite well. Otherwise this type of model can be less stable. It is recommended to test both with and without "
                 "the computed rate (by adding another coalescence rate parameter) to ensure the results are robust.",
