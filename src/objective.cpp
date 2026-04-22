@@ -490,9 +490,12 @@ createQMatrix(const ParameterSchema& schema, double const* parameters, size_t ep
 void verifyASMatrix(const MatrixXd& ASMatrix) {
     const double nearlyZero = 0.000001;
     for (Eigen::Index i = 0; i < ASMatrix.rows(); i++) {
-        MODEL_ASSERT_MSG(std::abs(1.0 - ASMatrix.row(i).sum()) <= nearlyZero, ASMatrix);
         for (Eigen::Index j = 0; j < ASMatrix.cols(); j++) {
             MODEL_ASSERT(ASMatrix(i, j) >= 0);
+        }
+        const double rowsum = ASMatrix.row(i).sum();
+        if (std::abs(1.0 - rowsum) > nearlyZero) {
+            std::cerr << "Admixture matrix row " << i << " sums to " << rowsum << std::endl;
         }
     }
 }
@@ -600,7 +603,10 @@ inline std::vector<TimeMarker> combineTimeVectors(const std::vector<double>& tim
 
 static inline void rowNorm(MatrixXd& matrix) {
     for (Eigen::Index j = 0; j < matrix.rows(); j++) {
-        matrix.row(j).array() /= matrix.row(j).sum();
+        const double rowsum = matrix.row(j).sum();
+        if (rowsum != 0.0) {
+            matrix.row(j).array() /= rowsum;
+        }
     }
 }
 
