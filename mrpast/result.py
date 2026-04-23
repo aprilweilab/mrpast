@@ -32,6 +32,11 @@ except ImportError:
     plt = None  # type: ignore
 
 
+# b is within 0.1% of a
+def _is_nearly(a, b, relerr=0.001):
+    return abs(a - b) / a <= relerr
+
+
 # A fixed parameter is a constant value specified by the user, and not used by the solver.
 def _param_is_fixed(parameter: Dict[str, Any]) -> bool:
     return parameter["lb"] == parameter["ub"]
@@ -106,6 +111,8 @@ def load_json_pandas(
                 "Parameter Type": "Epoch time",
                 "Fixed": is_fixed,
                 "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
+                "Lower Bound": p["lb"],
+                "Upper Bound": p["ub"],
             }
         )
         result.append(p)
@@ -134,6 +141,8 @@ def load_json_pandas(
                     "Epochs": epochs,
                     "Fixed": is_fixed,
                     "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
+                    "Lower Bound": p["lb"],
+                    "Upper Bound": p["ub"],
                 }
             )
             result.append(p)
@@ -156,6 +165,8 @@ def load_json_pandas(
                     "Epochs": epochs,
                     "Fixed": is_fixed,
                     "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
+                    "Lower Bound": p["lb"],
+                    "Upper Bound": p["ub"],
                 }
             )
             result.append(p)
@@ -185,6 +196,8 @@ def load_json_pandas(
                     "Epochs": epochs,
                     "Fixed": is_fixed,
                     "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
+                    "Lower Bound": coal2ne(p["ub"]),
+                    "Upper Bound": coal2ne(p["lb"]),
                 }
             )
             result.append(p)
@@ -209,6 +222,8 @@ def load_json_pandas(
                 "Epochs": [],  # TODO
                 "Fixed": is_fixed,
                 "covered": (truth >= (v - err_low) and truth <= (v + err_hi)),
+                "Lower Bound": p["lb"],
+                "Upper Bound": p["ub"],
             }
         )
         if "one_minus" in p:
@@ -222,6 +237,7 @@ def summarize_bootstrap_data(
     bootstrap_df: pd.DataFrame,
     use_median: bool = True,
     interval_conf: float = 0.95,
+    use_percentile: bool = False,
 ) -> pd.DataFrame:
     """
     Given a Pandas DataFrame loaded from a bootstrap CSV file, produce a new DataFrame
@@ -238,13 +254,16 @@ def summarize_bootstrap_data(
         1.0 means use the entire range of the bootstrap values instead of the standard
         deviation plus a confidence interval. The other values are the confidence for the
         normal distribution confidence intervals based on sample standard deviation.
+    :param use_percentile: Instead of computing the sample stddev, just use the percentile
+        from the bootstraps for each parameter.
     :return: DataFrame with one row per parameter, summarizing the value and confidence
         interval.
     """
-    ci_mult = {0.99: 2.576, 0.95: 1.96, 0.9: 1.645, 0.75: 1.150}.get(interval_conf)
-    assert (
-        ci_mult is not None or interval_conf == 1.0
-    ), f"Unsupported confidence {interval_conf}; try 1.0, 0.99, 0.95, 0.9, or 0.75"
+    if not use_percentile:
+        ci_mult = {0.99: 2.576, 0.95: 1.96, 0.9: 1.645, 0.75: 1.150}.get(interval_conf)
+        assert (
+            ci_mult is not None or interval_conf == 1.0
+        ), f"Unsupported confidence {interval_conf}; try 1.0, 0.99, 0.95, 0.9, or 0.75"
 
     def get_singular(df, label, field):
         items = df[df["label"] == label][field]
@@ -262,15 +281,20 @@ def summarize_bootstrap_data(
         median = np.median(values)
         mean = np.average(values)
         value = median if use_median else mean
-        if ci_mult is None:
-            c95_low = value - min(values)
-            c95_hi = max(values) - value
+        if use_percentile:
+            err_low, err_hi = np.percentile(values, [1 - interval_conf, interval_conf])
+            err_low = value - err_low
+            err_hi = err_hi - value
+            std_err = None
+        elif ci_mult is None:
+            err_low = value - min(values)
+            err_hi = max(values) - value
             std_err = None
         else:
             # numpy defaults to population stddev, so set degrees of freedom to 1
             std_err = np.std(values, ddof=1)
-            c95_low = max(0, (ci_mult * std_err))
-            c95_hi = max(0, (ci_mult * std_err))
+            err_low = max(0, (ci_mult * std_err))
+            err_hi = max(0, (ci_mult * std_err))
         new_data.append(
             {
                 "label": label,
@@ -279,15 +303,23 @@ def summarize_bootstrap_data(
                 "Parameter Type": get_singular(bootstrap_df, label, "Parameter Type"),
                 "Ground Truth": truth,
                 "Optimized Value": value,
-                "err_low": c95_low,
-                "err_hi": c95_hi,
+                "err_low": err_low,
+                "err_hi": err_hi,
                 "min": min(values),
                 "max": max(values),
                 "std": std_err,
                 "Epochs": get_singular(bootstrap_df, label, "Epochs"),
-                "covered": (truth >= (value - c95_low) and truth <= (value + c95_hi)),
+                "covered": (truth >= (value - err_low) and truth <= (value + err_hi)),
             }
         )
+        if "Upper Bound" in bootstrap_df.columns:
+            new_data[-1]["Upper Bound"] = get_singular(
+                bootstrap_df, label, "Upper Bound"
+            )
+        if "Lower Bound" in bootstrap_df.columns:
+            new_data[-1]["Lower Bound"] = get_singular(
+                bootstrap_df, label, "Lower Bound"
+            )
     return pd.DataFrame.from_dict(new_data).sort_values("label")
 
 
@@ -485,7 +517,12 @@ def get_matching_colors(num_demes, demes=[]):
     }
 
 
-def tab_show(filename: str, sort_by: str = "Index", show_popsize: bool = False):
+def tab_show(
+    filename: str,
+    sort_by: str = "Index",
+    show_popsize: bool = False,
+    bound_column: bool = False,
+):
     """
     Print an ASCII table showing the parameter values and their error from ground truth, for the
     given JSON output from the solver.
@@ -516,10 +553,14 @@ def tab_show(filename: str, sort_by: str = "Index", show_popsize: bool = False):
         gt = param["ground_truth"]
         final = param["final"]
         description = param["description"]
+        lower = param["lb"]
+        upper = param["ub"]
 
         if show_popsize and param["kind"] == "coalescence":
             gt = coal2ne(param, gt)
             final = coal2ne(param, final)
+            lower = coal2ne(param, lower)
+            upper = coal2ne(param, upper)
             description = description.replace("Coalescence rate", "Ne")
         abserr = abs(gt - final)
         total_abs += abserr
@@ -529,7 +570,7 @@ def tab_show(filename: str, sort_by: str = "Index", show_popsize: bool = False):
         for app in param["apply_to"]:
             epochs.add(app["epoch"])
         results.append(
-            (
+            [
                 param_idx,
                 description,
                 relerr,
@@ -537,8 +578,10 @@ def tab_show(filename: str, sort_by: str = "Index", show_popsize: bool = False):
                 gt,
                 final,
                 list(sorted(epochs)),
-            )
+            ]
         )
+        if bound_column:
+            results[-1].append(_is_nearly(lower, final) or _is_nearly(upper, final))
 
     headers = [
         "Index",
@@ -549,6 +592,8 @@ def tab_show(filename: str, sort_by: str = "Index", show_popsize: bool = False):
         "Final",
         "Epochs",
     ]
+    if bound_column:
+        headers.append("On Bounds")
 
     try:
         sort_key = headers.index(sort_by)
