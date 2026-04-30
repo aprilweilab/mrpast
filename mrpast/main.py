@@ -214,10 +214,21 @@ def solve(
     return outputs
 
 
+# This function summarizes how populations between the model and the ARG are mapped.
+#
+# The relevant user command-line options are:
+# 1. --leave-out just causes that ARG population to be ignored when COUNTING coalescences.
+#    It does not change the ordering of the ARG populations.
+# 2. --map-pops maps from ARG population to model population, when LOADING coalescences and
+#    turning them into the coal matrix (comes after counting, obviously).
+#
+# This function returns the ARG-based population information (names and sample counts), but
+# indexed according to the MODEL's population order.
 def get_popsummary_from_args(
     arg_prefix: str,
     leave_out_pops: List[int],
     pop_idx_map: Dict[int, int],
+    num_model_pops: int,
 ) -> List[Tuple[str, int]]:
     # Load the ARG from the tree-sequence(s) and bin the coalescence times.
     glb = f"{arg_prefix}*.trees"
@@ -231,16 +242,17 @@ def get_popsummary_from_args(
         # The ARG or the Model can have more populations than the other. When the ARG has more
         # populations, --leave-out must be used to drop some of them. When the Model has more,
         # those populations can remain unsampled from the ARG and inference can proceed.
-        largest_mapped = 0
-        if pop_idx_map:
-            largest_mapped = max(pop_idx_map.values())
-        pop2names = ["N/A" for _ in range(max(ts.num_populations, largest_mapped + 1))]
+        pop2names = ["N/A" for _ in range(num_model_pops)]
         for pop in ts.populations():
-            if pop.id in leave_out_pops:
-                del pop2names[pop.id]
-            else:
+            if pop.id not in leave_out_pops:
                 pop_id = pop_idx_map.get(pop.id, pop.id)
-                pop2names[pop_id] = pop.metadata.get("name", f"pop_{pop_id}")
+                if pop_id < len(pop2names):
+                    pop2names[pop_id] = pop.metadata.get("name", f"pop_{pop_id}")
+                else:
+                    raise UserInputError(
+                        f"ARG has 0-based population index {pop_id}, but model only has {num_model_pops} populations."
+                        " See --leave-out and --map-pops command line arguments."
+                    )
         assert all(map(lambda pstr: len(pstr) > 0, pop2names))
         pop2count = [0 for _ in pop2names]
         for tree in ts.trees():
@@ -1146,29 +1158,22 @@ def main():
             print("FAILURE: Invalid user input", file=sys.stderr)
             print(e, file=sys.stderr)
             exit(5)
+        model = UserModel.from_file(args.model)
         header = ["Model Population", "ARG Population", "Haploid Samples"]
-        arg_pops = get_popsummary_from_args(
+        mapped_pops = get_popsummary_from_args(
             args.arg_prefix,
             leave_out,
             pop_idx_map,
+            len(model.pop_names),
         )
-        model = UserModel.from_file(args.model)
-        fail = False
         print()
-        if len(arg_pops) != len(model.pop_names):
-            print(
-                f"ERROR: Model has {len(model.pop_names)} populatons, but the ARG has {len(arg_pops)}",
-                file=sys.stderr,
-            )
-            fail = True
         print("Review closely: ARG population to Model population mapping")
         print(
             tabulate(
-                [([m] + list(a)) for a, m in zip(arg_pops, model.pop_names)],
+                [([m] + list(a)) for a, m in zip(mapped_pops, model.pop_names)],
                 headers=header,
             )
         )
-        assert not fail, "Failed to process ARGs"
     elif args.command == CMD_SOLVE:
         solver_outputs = solve(args.solver_inputs, args.jobs, args.timeout)
         print(f"Created outputs: {[fn for (fn, elapsed) in solver_outputs]}")
