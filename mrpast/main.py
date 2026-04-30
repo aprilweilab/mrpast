@@ -1282,7 +1282,7 @@ def main():
             print(
                 "WARNING: --bootstrap is now the default, and no longer needs to be specified. Use --gim to get GIM-based results."
             )
-        base_name = remove_ext(os.path.basename(args.solved_result))
+        base_name = remove_ext(args.solved_result)
         if args.gim:
             cmd = [eval_exe, "intervals", args.solved_result]
             if args.simple_expect:
