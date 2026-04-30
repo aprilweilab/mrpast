@@ -91,10 +91,12 @@ class EndToEndTests(unittest.TestCase):
             # Now we process this simulated data three separate ways:
             # 1. With the same model that generated it.
             self.process(MODEL_OOA3, tmpdirname)
-            # 2. With a model that contains _fewer_ populations, here we have to drop
+            # 2. With the same model that generated it, but treat pop2 as unsampled.
+            self.process(MODEL_OOA3, tmpdirname, leave_out=[2])
+            # 3. With a model that contains _fewer_ populations, here we have to drop
             #    one of the populations and make sure the mapping is correct.
             self.process(MODEL_OOA2, tmpdirname, leave_out=[2])
-            # 3. With a model that contains _more_ populations, here we have to specify
+            # 4. With a model that contains _more_ populations, here we have to specify
             #    the population mapping, which can include mapping a non-existing ARG
             #    population to the last population (which treats it as unsampled).
             self.process(MODEL_OOA4, tmpdirname, pop_map={0: 0, 1: 1, 2: 2, 3: 3})
