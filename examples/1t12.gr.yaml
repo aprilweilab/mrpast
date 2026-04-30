@@ -1,0 +1,25 @@
+# Same as 1t12.yaml, except the coalescence rate for epoch 1 is computed
+# implicity from the epoch 0 coalescence rate + growth rate. When this relationship
+# is correct to the data, then this approach tends to be more accurate. When the
+# data has a sharp change in population size before the growth starts, then you need
+# to explicitly model the coalescence rate (like 1t12.yaml)
+ploidy: 2
+pop_count: 1
+pop_names:
+- AFR
+coalescence:
+  entries:
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 2}}
+  - {"epoch": 1, "deme": "AFR", "rate": "previous"}
+  - {"epoch": 2, "deme": "AFR", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 6.839945280437756e-05, "lb": 6.839945280437756e-06, "ub": 0.0006839945280437756, "index": 1}
+  - {"ground_truth": 1.1570737191765288e-06, "lb": 1.1570737191765288e-07, "ub": 1.1570737191765288e-05, "index": 2}
+growth:
+  entries:
+  - {"epoch": 0, "deme": "AFR", "rate": {"param": 1}}
+  parameters:
+  - {"ground_truth": 0.0166, "lb": 0.01, "ub": 0.025, "index": 1}
+epochTimeSplit:
+- {"ground_truth": 204.6, "lb": 100, "ub": 400, "index": 1}
+- {"ground_truth": 5920.0, "lb": 3062.0, "ub": 7451.0, "index": 2}

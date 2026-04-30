@@ -69,17 +69,13 @@ static inline ObservationMode parse_obs_mode(const std::string& obsModeStr) {
 enum Adjustment {
     ADJUST_NONE = 0,
     ADJUST_GROWTH_RATE = 1,
-    ADJUST_INV_GROWTH_RATE = 2,
 };
 
 static inline Adjustment parse_adjust(const std::string& adjustStr) {
     if (adjustStr == "growth_rate") {
         return ADJUST_GROWTH_RATE;
     }
-    if (adjustStr == "inverse_growth_rate") {
-        return ADJUST_INV_GROWTH_RATE;
-    }
-    abort();
+    user_exc_check(false, "Invalid JSON input. Unexpected adjustment: " << adjustStr);
 }
 
 // An application of a variable to a matrix. This is interpreted as:
@@ -92,6 +88,7 @@ struct VariableApplication {
     size_t j;
     size_t epoch;
     Adjustment adjust;
+    bool copyPreviousNe;
 };
 
 // An optimizable parameter to the model.
