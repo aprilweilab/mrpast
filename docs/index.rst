@@ -78,5 +78,6 @@ Use the links below or on the left menu-bar to learn more.
   Using real data <real_data>
   Creating/modifying models <modeling>
   Very short examples <examples>
+  FAQ/HOWTO <faq_howto>
   python_api
 

@@ -30,6 +30,7 @@ import random
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import tskit
 import uuid
@@ -278,10 +279,11 @@ def get_popsummary_from_args(
 
 
 def get_coaldist_from_arg(
-    arg_prefix,
-    jobs=1,
-    leave_out_pops=[],
-    min_time_unit=1.0,
+    coal_dir: str,
+    arg_prefix: str,
+    jobs: int = 1,
+    leave_out_pops: List[int] = [],
+    min_time_unit: float = 1.0,
     tree_sample_rate: int = DEFAULT_TREE_SAMPLE_RATE,
     rate_maps: Optional[str] = None,
     rate_map_threshold: float = 1.0,
@@ -323,10 +325,11 @@ def get_coaldist_from_arg(
                 expanded_rate_maps.append(rate_map)
     else:
         expanded_rate_maps = [None for _ in tree_files]
+
     params = [
         [
             fn,
-            f"{fn}-coal.txt",
+            os.path.join(coal_dir, f"{os.path.basename(fn)}-coal.txt"),
             tree_sample_rate,
             min_time_unit,
             leave_out_pops,
@@ -613,63 +616,78 @@ def process_ARGs(
     generic_prefix = f"{model_base}.{suffix}"
     solve_in_prefix = f"{generic_prefix}.solve_in"
 
-    # Step 1: collect coalescence distributions from the ARG, or load it from a previously
-    # generated JSON file.
-    coal_filenames = get_coaldist_from_arg(
-        arg_prefix,
-        jobs=jobs,
-        leave_out_pops=leave_out,
-        min_time_unit=min_time_unit,
-        tree_sample_rate=tree_sample_rate,
-        rate_maps=rate_maps,
-        rate_map_threshold=rate_map_threshold,
-    )
-    if verbose:
-        print(f"Wrote coalescences to {coal_filenames}")
-
-    unmatched = []
-    groups = defaultdict(list)
-    if group_by is None:
-        if bootstrap == BootstrapOpt.none:
-            group_by = SAMPLE_GROUP_BY
-        else:
-            group_by = CHROM_GROUP_BY
-    group_regex = re.compile(group_by)
-    for fn in coal_filenames:
-        m = group_regex.search(fn)
-        if m is None:
-            unmatched.append(fn)
-        else:
-            group_id = m.group(1)
-            groups[group_id].append(fn)
-    if unmatched and len(groups) > 0:
-        print(f"Some coal files matched --group-by regex, others did not.")
-        exit(1)
-    if unmatched:
-        print(f"WARNING: No matches for --group-by {group_by}", file=sys.stderr)
-        groups["all"] = unmatched
-
-    # Get time slices and coal matrices - this may produce many matrices if we are using
-    # a sampling strategy like bootstrap or jackknife.
-    ts_list, ts_is_extra = time_slice_list(time_slice_str)
-    if not ts_list or ts_is_extra:
-        time_slices = get_time_slices(
-            coal_filenames, num_times, max_generation, left_skewed=left_skew_times
+    # Users can override the coal count directory, if they don't want to use the system TEMPDIR
+    use_tempdir = os.environ.get("MRP_TMP_DIR")
+    with tempfile.TemporaryDirectory(
+        dir=use_tempdir, prefix="mrpast_coals"
+    ) as coal_dir:
+        if "MRP_COAL_DIR" in os.environ:
+            coal_dir = os.environ["MRP_COAL_DIR"]
+            assert os.path.isdir(
+                coal_dir
+            ), f"MRP_COAL_DIR={coal_dir}: the directory must exist."
+            print(
+                f"Keeping coalescence counts in directory {coal_dir}", file=sys.stderr
+            )
+        # Step 1: collect coalescence distributions from the ARG, or load it from a previously
+        # generated JSON file.
+        coal_filenames = get_coaldist_from_arg(
+            coal_dir,
+            arg_prefix,
+            jobs=jobs,
+            leave_out_pops=leave_out,
+            min_time_unit=min_time_unit,
+            tree_sample_rate=tree_sample_rate,
+            rate_maps=rate_maps,
+            rate_map_threshold=rate_map_threshold,
         )
-        time_slices = sorted(time_slices + ts_list)
-    else:
-        time_slices = ts_list
+        if verbose:
+            print(f"Wrote coalescences to {coal_filenames}")
 
-    coal_matrices, sampling_description, sampling_hashes = get_coal_counts(
-        model,
-        groups,
-        time_slices,
-        bootstrap,
-        bootstrap_iter,
-        jobs=jobs,
-        seed=seed,
-        pop_idx_map=pop_idx_map,
-    )
+        unmatched = []
+        groups = defaultdict(list)
+        if group_by is None:
+            if bootstrap == BootstrapOpt.none:
+                group_by = SAMPLE_GROUP_BY
+            else:
+                group_by = CHROM_GROUP_BY
+        group_regex = re.compile(group_by)
+        for fn in coal_filenames:
+            m = group_regex.search(fn)
+            if m is None:
+                unmatched.append(fn)
+            else:
+                group_id = m.group(1)
+                groups[group_id].append(fn)
+        if unmatched and len(groups) > 0:
+            print(f"Some coal files matched --group-by regex, others did not.")
+            exit(1)
+        if unmatched:
+            print(f"WARNING: No matches for --group-by {group_by}", file=sys.stderr)
+            groups["all"] = unmatched
+
+        # Get time slices and coal matrices - this may produce many matrices if we are using
+        # a sampling strategy like bootstrap or jackknife.
+        ts_list, ts_is_extra = time_slice_list(time_slice_str)
+        if not ts_list or ts_is_extra:
+            time_slices = get_time_slices(
+                coal_filenames, num_times, max_generation, left_skewed=left_skew_times
+            )
+            time_slices = sorted(time_slices + ts_list)
+        else:
+            time_slices = ts_list
+
+        coal_matrices, sampling_description, sampling_hashes = get_coal_counts(
+            model,
+            groups,
+            time_slices,
+            bootstrap,
+            bootstrap_iter,
+            jobs=jobs,
+            seed=seed,
+            pop_idx_map=pop_idx_map,
+        )
+
     # Step 2: generate the solver input file.
     solver_input_ids, solver_input_data = generate_solver_input(
         model,
