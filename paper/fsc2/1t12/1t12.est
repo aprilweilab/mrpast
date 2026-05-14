@@ -1,0 +1,16 @@
+// Priors and rules file  
+// *********************  
+[PARAMETERS]  
+//#isInt? #name #dist.#min #max  
+//all Ns are in number of haploid individuals  
+1 NCUR unif 86424 8642490 output  
+1 N1 unif 2894 289480 output  
+1 N2 unif 1462 146200 output  
+1 T1 unif 100 400 output  
+1 T2 unif 3062 7451 output  
+0 GRATE logunif 0.01 0.025 output
+ 
+[COMPLEX PARAMETERS]  
+0 REL1 = N1/NCUR hide  
+0 REL2 = N2/N1 hide  
+0 GNRATE = 0-GRATE hide

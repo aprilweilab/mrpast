@@ -1,0 +1,34 @@
+// Priors and rules file  
+// *********************  
+[PARAMETERS]  
+//#isInt? #name #dist.#min #max  
+//all Ns are in number of haploid individuals  
+1 AFR_N0 unif 2460 246000
+1 EUR_N0 unif 5945 594510
+1 ASIA_N0 unif 10818 1081810
+1 NAT_N0 unif 212 21280
+1 ADMIX_N0 unif 2000 200000
+1 AFR_ABS_N1 unif 1460 146000
+1 ASIA_ABS_N1 unif 323 32370
+1 EUR_ABS_N1 unif 463 46330
+1 EUR_ABS_N2 unif 420 42000
+1 T1 unif 5 50 output
+1 T2 unif 500 800 output
+1 T3 unif 800 1000 output
+1 T4 unif 5400 5800 output
+1 T5 unif 8600 9000 output
+0 EUR_G unif 0.001 0.05 output
+0 ASIA_G unif 0.001 0.05 output
+0 AM1 unif 0.05 0.80 output
+0 AM2 unif 0.05 0.80 output
+
+ 
+[COMPLEX PARAMETERS]  
+0 AFR_N1 = AFR_ABS_N1/AFR_N0 hide  
+0 ASIA_N1 = ASIA_ABS_N1/ASIA_N0 hide  
+0 EUR_N1 = EUR_ABS_N1/EUR_N0 hide  
+0 EUR_N2 = EUR_ABS_N2/EUR_ABS_N1 hide  
+0 AM_TMP = 1 - AM1 hide
+0 AMPAR2 = AM_TMP * AM2 hide
+0 EUR_NG = 0 - EUR_G hide
+0 ASIA_NG = 0 - ASIA_G hide

@@ -1,0 +1,21 @@
+# Simulated ARGs
+
+For simulated ARGs, we ran with 10 and 100 trees, and with/without the exponential growth simplification
+(see "USE_EXP" in the python script - using this simplification removes one parameter, and helps both
+ gLike and mrpast in analyzing this model).
+
+Using 10 trees and the exponential growth simplification produced the best results.
+Our reported results are from:
+```
+USE_EXP=1 TREES10=1 python glike.1t12.py 1t12_50.simdata/1t12_50_sim__0-0.trees 1t12_50.simdata/1t12_50_sim__0-0.trees.popmap.json
+```
+
+We ran this 50 times, once for each of the same simulated replicates that we used with mrpast.
+
+# tsinfer ARGs
+
+We used the same configuration as with the simulated ARGs (it also produced the best results on inferred ARGs).
+
+```
+USE_EXP=1 TREES10=1 python glike.1t12.py 0_tsinfer/1t121t12___0-0.trees.vcz.tsdate.trees 0_simdata_1t12/1t12___0-0.trees.popmap.json
+```
