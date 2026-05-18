@@ -164,9 +164,9 @@ Ensembl `here <https://ftp.ensembl.org/pub/release-112/fasta/ancestral_alleles/>
 Rate Maps
 ---------
 
-For both simulation and inference, *mrpast* uses [msprime.RateMap](https://tskit.dev/msprime/docs/stable/rate_maps.html)-style recombination maps.
-The only place where this is not true is for ``mrpast arginfer --tool relate``, which requires [Relate's input format for rates](https://myersgroup.github.io/relate/input_data.html).
-If you have rate maps downloaded in HapMap-style, you can convert them to what *mrpast* needs via [make_rate_map.py](https://github.com/aprilweilab/mrpast/blob/main/scripts/make_rate_map.py).
+For both simulation and inference, *mrpast* uses `msprime.RateMap <https://tskit.dev/msprime/docs/stable/rate_maps.html>`_-style recombination maps.
+The only place where this is not true is for ``mrpast arginfer --tool relate``, which requires `Relate's input format for rates <https://myersgroup.github.io/relate/input_data.html>`_.
+If you have rate maps downloaded in HapMap-style, you can convert them to what *mrpast* needs via `make_rate_map.py <https://github.com/aprilweilab/mrpast/blob/main/scripts/make_rate_map.py>`_.
 
 Model/ARG Population Mismatches
 -------------------------------

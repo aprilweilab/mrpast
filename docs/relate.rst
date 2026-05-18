@@ -138,7 +138,7 @@ Now we can run Relate on our data.
 
 .. note::
   If you are using non-simulated data, you will need to filter and polarize your data prior to running
-  Relate! You can use Relate's preparation script directly ([here](https://myersgroup.github.io/relate/input_data.html#Prepare))
+  Relate! You can use Relate's preparation script directly (`here <https://myersgroup.github.io/relate/input_data.html#Prepare>`_)
   or you can use ``mrpast polarize`` after filtering.
 
 
