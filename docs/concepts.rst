@@ -155,10 +155,18 @@ These second, indirect methods, make use of the Godambe Information Matrix (GIM)
 
 Polarization
 -------------------------
-All three ARG methods integrated with mrpast work best with polarized data. mrpast can do the polarization for you via
+When using ``mrpast arginfer --tool tsinfer``, you can just pass in the ancestral FASTA file with ``--ancestral``. For SINGER and Relate,
+it is best to polarize (and filter) the data before calling ``mrpast arginfer``. mrpast can do the polarization for you via
 ``mrpast polarize``. An ancestral FASTA sequence is required for performing polarization. The GRCh37 human ancestral sequence can be found via the
 `relate documentation <https://myersgroup.github.io/relate/input_data.html#Data>`_, and GRCh38 human ancestral sequence can be found from
 Ensembl `here <https://ftp.ensembl.org/pub/release-112/fasta/ancestral_alleles/>`_.
+
+Rate Maps
+---------
+
+For both simulation and inference, *mrpast* uses [msprime.RateMap](https://tskit.dev/msprime/docs/stable/rate_maps.html)-style recombination maps.
+The only place where this is not true is for ``mrpast arginfer --tool relate``, which requires [Relate's input format for rates](https://myersgroup.github.io/relate/input_data.html).
+If you have rate maps downloaded in HapMap-style, you can convert them to what *mrpast* needs via [make_rate_map.py](https://github.com/aprilweilab/mrpast/blob/main/scripts/make_rate_map.py).
 
 Model/ARG Population Mismatches
 -------------------------------

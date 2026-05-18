@@ -5,7 +5,7 @@ Using real data
 
 The workflow for analyzing real (non-simulated data) is typically:
 
-1. ``mrpast polarize`` the data.
+1. [NOT NEEDED FOR *tsinfer*] ``mrpast polarize`` the data. Only Relate and SINGER need the data filtered and polarized prior to running ``mrpast arginfer``, since tsinfer takes the ancestral state as an input argument you can just pass in an ancestral sequence with ``--ancestral``.
 2. ``mrpast arginfer`` on the polarized data to produce ARGs.
 3. ``mrpast process --solve`` to process and solve the maximum likelihood problem.
 4. ``mrpast confidence`` to generate confidence intervals on the parameters.
