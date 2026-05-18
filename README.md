@@ -4,8 +4,15 @@
 
 # mrpast
 
-Infer demographic parameters from Ancestral Recombination Graphs (ARGs). See [the preprint](https://www.biorxiv.org/content/10.1101/2025.10.07.680347v1)
-for details on the method and results.
+Infer demographic parameters from Ancestral Recombination Graphs (ARGs), by extracting pairwise coalescence counts for use in a maximum likelihood model. For detail on the method and results, see the [preprint](https://www.biorxiv.org/content/10.1101/2025.10.07.680347v1):
+
+> DeHaas, Drew, Zhibai Jia, Leo Speidel, and Xinzhu Wei. "Inference of complex demographic history using composite likelihood based on whole-genome genealogies." bioRxiv (2025): 2025-10.
+
+See [the documentation](https://mrpast.readthedocs.io/en/latest/) for commands, examples, and concepts.
+
+See [PAPER_EXPERIMENTS.md](PAPER_EXPERIMENTS.md) for the configurations that were used in the paper.
+
+![](docs/diagram.png)
 
 ## Install
 
@@ -16,7 +23,7 @@ Install from PyPi:
 pip install mrpast
 ```
 
-On Linux, this will use prebuilt binaries. On MacOS, this will trigger a source code build, which requires CMake and gcc or clang (C++17 support required).
+On Linux, this will use prebuilt binaries. On MacOS, this will trigger a source code build, which requires [CMake](https://cmake.org/download/) and `gcc` or `clang` (C++17 support required).
 
 You can also install the [conda package](https://bioconda.github.io/recipes/mrpast/README.html) via the [bioconda](https://bioconda.github.io/) channel: `conda install mrpast`.
 
@@ -34,35 +41,7 @@ git clone --recursive https://github.com/aprilweilab/mrpast.git
 pip install mrpast/
 ```
 
-### Alternative installation options
-
-1. Compile for the native CPU; this can speed up the numerical solver, but makes the resulting package less portable.
-```
-MRPAST_ENABLE_NATIVE=1 pip install mrpast/ 
-```
-
-2. Build the solver in debug mode, so GDB can be attached.
-```
-MRPAST_DEBUG=1 pip install mrpast/
-```
-
-## IMPORTANT: NEW MODEL FORMAT
-
-If you used MrPast prior to August 14, 2025, you may have models in the "old" format. The new format attempts
-to be more user friendly. See [the examples](https://github.com/aprilweilab/mrpast/tree/main/examples) for the
-new format.
-
-To convert an "old style" model, `foo.yaml` to the new style, just do:
-```
-mrpast init --from-old-mrpast foo.yaml > foo.new.yaml
-```
-
-The documentation is still not updated w/r/t the new model format, but hopefully the examples are sufficient to
-explain the changes.
-
 ## Usage
-
-See [the documentation](https://mrpast.readthedocs.io/en/latest/) for examples and details.
 
 There are three primary subcommands to `mrpast`, and they are usually run in this order:
 1. `mrpast simulate`
@@ -70,20 +49,20 @@ There are three primary subcommands to `mrpast`, and they are usually run in thi
 3. `mrpast solve`
 
 These steps describe the "Simulated ARG" workflow, where no ARG inference is performed. See
-the documentation for workflows making use of inferred ARGs.
+[the documentation](https://mrpast.readthedocs.io/en/latest/) for workflows making use of inferred ARGs.
 
 ### Simulation
 
 In order to test out a demographic model, it is recommended that you start out
 by simulating that model and verifying that `mrpast` can recover the model
 parameters with the necessary accuracy. The simulation is done via
-[msprime](https://tskit.dev/msprime/docs/stable/intro.html) and produces an
-ancestral recombination graph (ARG) in the form of a tree-sequence file
-(`.trees`).
+[msprime](https://tskit.dev/msprime/docs/stable/intro.html) and produces
+ancestral recombination graphs (ARGs) in the form of a [tskit](https://tskit.dev/tskit/docs/stable/introduction.html)
+tree-sequence file (`.trees`).
 
 Example:
 ```
-# Simulate the model 10 times, using a DNA sequence length of 100Kbp and the default recombination rate
+# Simulate the model 10 times, using a DNA sequence length of 100Kbp and the default recombination rate (1e-8)
 mrpast simulate --replicates 10 --seq-len 100000 --debug-demo examples/5deme1epoch.yaml 5de1
 ```
 
@@ -113,10 +92,15 @@ If you didn't pass `--solve` to `mrpast process` then you can run the solver via
 mrpast solve --jobs 10 5deme1epoch.*.solve_in.*.json
 ```
 
-The resulting output files will be listed, and the best output (best likelihood)
+The resulting output files will be listed, and the best output (maximum likelihood)
 will be listed as well. The JSON files for the output contains the parameter
 values, their bounds, their initialized values, and (if present) their ground
-truth values.
+truth values. Assuming the best result was `5deme1epoch.trial1.solve_in.0.out.json`,
+we can quickly view the results via
+
+```
+mrpast show -n 5deme1epoch.trial1.solve_in.0.out.json
+```
 
 ### Other workflows
 
@@ -137,4 +121,17 @@ The real data workflow is:
 
 ## Modeling
 
-The demographic model is specified via [YAML](https://yaml.org/). See the [examples directory](https://github.com/aprilweilab/mrpast/tree/main/examples) for example models. See the documentation for details on model syntax and behavior.
+The demographic model is specified via [YAML](https://yaml.org/). See the [examples directory](https://github.com/aprilweilab/mrpast/tree/main/examples) for example models. See [the documentation](https://mrpast.readthedocs.io/en/latest/) for details on model syntax and behavior.
+
+## Alternative installation options
+
+1. Compile for the native CPU; this can speed up the numerical solver, but makes the resulting package less portable.
+```
+MRPAST_ENABLE_NATIVE=1 pip install mrpast/
+```
+
+2. Build the solver in debug mode, so GDB can be attached.
+```
+MRPAST_DEBUG=1 pip install mrpast/
+```
+

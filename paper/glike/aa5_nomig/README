@@ -1,0 +1,21 @@
+# Simulated ARGs
+
+For simulated ARGs, we ran with 10 and 100 trees, the latter produced the best results.
+We also ran with random initialization and INIT_TRUTH=1 (which, as expected, produced the best results,
+since the solver starts from the true parameters values and then finds the maximum likelihood solution
+by searching from there).
+
+Our reported results are from:
+```
+INIT_TRUTH=1 TREES100=1 python glike.aa5.nomig.py aa5.nomig_50.simdata/aa5.nomig_50_sim__0-0.trees aa5.nomig_50.simdata/aa5.nomig_50_sim__0-0.trees.popmap.json
+```
+
+# tsinfer ARGs
+
+We used the same configuration as with the simulated ARGs, except we needed to skip certain
+trees that caused gLike to throw exceptions, so while we requested 100 trees, we skipped 5 of
+them due to this (TSINFER=1 skips a hardcoded list of trees).
+
+```
+TSINFER=1 INIT_TRUTH=1 TREES100=1 python glike.aa5.nomig.py aa5.nomig.tsi/aa5.nomig_50_tsi_aa5.nomig_50_sim__0-0.trees.vcz.tsdate.trees aa5.nomig_50.simdata/aa5.nomig_50_sim__0-0.trees.popmap.json
+```
