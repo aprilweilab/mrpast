@@ -94,11 +94,11 @@ mkdir -p 1t12.simdata/${REP}/
 mkdir -p 1t12.output/${REP}/
 
 # Simulate the model (seconds to minutes)
-mrpast simulate -j 20 --individuals 50 --seed ${REP} examples/1t12.gr.yaml 1t12.simdata/${REP}/1t12_sim_
+mrpast simulate -j 20 --individuals 50 --seed ${REP} --recomb-rate ratemap1.chr examples/1t12.gr.yaml 1t12.simdata/${REP}/1t12_sim_
 
 # Process AND SOLVE the model (minutes). Only on big models do we need to solve
 # separately (because the solve is so slow and we need to set a timeout)
-mrpast process -j 20 --solve --time-slices +100,150,200 --num-times 200 --tree-sample-rate 125000 --bootstrap coalcounts --suffix sim --out-dir 1t12.output/${REP}/ examples/1t12.gr.yaml 1t12.simdata/${REP}/1t12_sim_
+mrpast process -j 20 --solve --time-slices +100,150,200 --num-times 200 --tree-sample-rate 125000 --rate-maps ratemap1.chr --bootstrap coalcounts --suffix sim --out-dir 1t12.output/${REP}/ examples/1t12.gr.yaml 1t12.simdata/${REP}/1t12_sim_
 ```
 
 ### Simulated ARGs, standard time slices
@@ -108,7 +108,7 @@ In the supplement, we show results WITHOUT adding some extra time slices to cove
 ```
 mkdir -p 1t12_nots.output/${REP}/
 
-mrpast process -j 20 --solve --num-times 200 --tree-sample-rate 125000 --bootstrap coalcounts --suffix sim --out-dir 1t12_nots.output/${REP}/ examples/1t12.gr.yaml 1t12.simdata/${REP}/1t12_sim_
+mrpast process -j 20 --solve --num-times 200 --tree-sample-rate 125000 --rate-maps ratemap1.chr --bootstrap coalcounts --suffix sim --out-dir 1t12_nots.output/${REP}/ examples/1t12.gr.yaml 1t12.simdata/${REP}/1t12_sim_
 ```
 
 ### Inferred ARGs
@@ -123,10 +123,10 @@ mrpast sim2vcf -j 20 -p --zarr 1t12.simdata/${REP}/1t12_sim_
 
 # Infer the ARGs (hours)
 mkdir -p 1t12.0.tsinfer/
-mrpast arginfer -j 40 --tool tsinfer 1t12.simdata/0/1t12_sim_  1t12.0.tsinfer/1t12_tsi_ 1t12.simdata/0/1t12_sim__0-0.trees.popmap.json
+mrpast arginfer -j 40 --recomb-rate ratemap1.chr --tool tsinfer 1t12.simdata/0/1t12_sim_  1t12.0.tsinfer/1t12_tsi_ 1t12.simdata/0/1t12_sim__0-0.trees.popmap.json
 
 # Process and solve the model (minutes)
-mrpast process -j 20 --solve --time-slices +100,150,200 --num-times 200 --tree-sample-rate 125000 --bootstrap coalcounts --suffix tsi --out-dir 1t12.tsi.output/ examples/1t12.gr.yaml 1t12.0.tsinfer/1t12_tsi_
+mrpast process -j 20 --solve --time-slices +100,150,200 --num-times 200 --tree-sample-rate 125000 --rate-maps ratemap1.chr --bootstrap coalcounts --suffix tsi --out-dir 1t12.tsi.output/ examples/1t12.gr.yaml 1t12.0.tsinfer/1t12_tsi_
 ```
 
 ## Out-of-Africa 3-population model
