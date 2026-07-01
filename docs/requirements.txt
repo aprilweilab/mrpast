@@ -7,3 +7,4 @@ pydata-sphinx-theme
 pyfaidx
 pyyaml
 tskit
+tabulate
