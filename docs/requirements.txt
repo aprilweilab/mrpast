@@ -1,1 +1,9 @@
-sphinx-rtd-theme
+dataclasses_json
+msprime
+numpy
+orjson
+pandas
+pydata-sphinx-theme
+pyfaidx
+pyyaml
+tskit
