@@ -1385,7 +1385,30 @@ def main():
     elif args.command == CMD_SHOW:
         if args.solved_result.endswith(".csv"):
             df = pd.read_csv(args.solved_result)
-            print(df)
+            COLUMNS = [
+                "description",
+                "init",
+                "lb",
+                "ub",
+                "label",
+                "Ground Truth",
+                "err_low",
+                "err_hi",
+                "Optimized Value",
+                "Parameter Type",
+                "Fixed",
+                "Epochs",
+                "sample",
+                "negLL",
+            ]
+            if len(set(COLUMNS) & set(df.columns)) < len(COLUMNS):
+                print(
+                    "Warning: unexpected column list in CSV file, may not render very well.",
+                    file=sys.stderr,
+                )
+                print(df.to_string())
+            else:
+                print(df.to_string(columns=COLUMNS))
         else:
             tab_show(args.solved_result, args.sort_by, args.show_ne)
     elif args.command == CMD_SELECT:
