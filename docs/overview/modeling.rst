@@ -30,6 +30,20 @@ You can convert a mrpast model to a Demes model via:
 
   mrpast model my_mrpast.yaml --to-demes my_demes.yaml
 
+Viewing a model
+~~~~~~~~~~~~~~~
+
+Convert to Demes, then create a PNG image using the excellent `demesdraw <https://grahamgower.github.io/demesdraw/latest/quickstart.html>`_:
+
+::
+
+  pip install demesdraw
+  mrpast model examples/ooa_3g09.yaml --to-demes ooa3.demes.yaml
+  demesdraw tubes --log-time ooa3.demes.yaml ooa3.demes.png 
+
+.. image:: ooa3.demes.png
+
+
 Components of a mrpast model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

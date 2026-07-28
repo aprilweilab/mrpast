@@ -6,6 +6,7 @@ SINGER
 
 .. warning::
   SINGER support is still experimental, and our integration is not as well tested or supported as tsinfer or Relate.
+  On the models we have tested, using ``mrpast`` with ``SINGER`` was not as accurate as ``tsinfer+tsdate``. It may be worth comparing multiple ARG inference methods on your model(s).
 
 This walkthrough uses `this fork of SINGER <https://github.com/dcdehaas/SINGER>`_ that has a few minor changes from
 the `main fork <https://github.com/popgenmethods/SINGER>`_.
