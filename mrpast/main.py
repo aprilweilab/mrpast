@@ -118,7 +118,7 @@ CMD_SELECT = "select"
 
 
 class BootstrapOpt(Enum):
-    none = ""
+    none = "none"
     coalcounts = "coalcounts"
     jackknife = "jackknife"
 
@@ -843,7 +843,7 @@ def main():
     process_parser.add_argument(
         "--bootstrap",
         type=BootstrapOpt,
-        default=BootstrapOpt.none,
+        default=BootstrapOpt.coalcounts,
         choices=list(BootstrapOpt),
         help=f"Bootstrap the sampled trees to create more than once coalescent matrix.\n"
         "  coalcounts: standard bootstrap of over marginal trees."
