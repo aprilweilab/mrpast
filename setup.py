@@ -6,7 +6,7 @@ from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
 PACKAGE_NAME = "mrpast"
-VERSION = "0.3"
+VERSION = "0.4"
 
 
 THIS_DIR = os.path.dirname(os.path.realpath(__file__))
