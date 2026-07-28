@@ -57,7 +57,7 @@ script in the mrpast repository.
 
 We're going to use the `OutOfAfrica_3G09 model <https://popsim-consortium.github.io/stdpopsim-docs/stable/catalog.html#sec_catalog_homsap_models_outofafrica_3g09>`_
 from stdpopsim. We have already converted this model from the Demes model
-(see `the modeling section <modeling.html>`_), so we'll simulate through mrpast directly:
+(see `the modeling section <../overview/modeling.html>`_), so we'll simulate through mrpast directly:
 
 ::
 
@@ -123,7 +123,7 @@ example of one of these files:
 
 Each row in "mapping" corresponds to a population. So the 1st row (row 0) is the
 first population (population 0), as defined in the original model file
-(`mrpast/examples/ooa_3g09.yaml`). Each of the numbers in the row is an
+(``mrpast/examples/ooa_3g09.yaml``). Each of the numbers in the row is an
 individual ID (or "index") that is in the given population. So individuals 0-9
 are in population 0, individuals 10-19 are in population 1, etc. The names of
 the populations, in the same order, are "YRI", "CEU", etc.
@@ -154,7 +154,7 @@ We can now process the ARGs and solve for our model parameters. Lets first solve
 ::
 
   mkdir -p ooa3.simarg.output/
-  mrpast process -j 4 --num-times 50L --solve --out-dir ooa3.simarg.output/ --bootstrap coalcounts ooa_3g09.yaml ooa3.simdata/ooa3_msprime_
+  mrpast process -j 4 --num-times 200 --solve --out-dir ooa3.simarg.output/ --bootstrap coalcounts ooa_3g09.yaml ooa3.simdata/ooa3_msprime_
 
 
 When processing completes, it will print something like "The output with the highest likelihood is ooa3.simarg.output/ooa_3g09.b0f8fc9b.solve_in.bootstrap.10.out.json".
@@ -190,7 +190,7 @@ Now lets process the inferred ARGs:
 ::
 
   mkdir -p ooa3.tsarg.output/
-  mrpast process -j 4 --num-times 50L --solve --out-dir ooa3.tsarg.output/ --bootstrap coalcounts ooa_3g09.yaml ooa3.tsinfer/ooa3_ts_
+  mrpast process -j 4 --num-times 200 --solve --out-dir ooa3.tsarg.output/ --bootstrap coalcounts ooa_3g09.yaml ooa3.tsinfer/ooa3_ts_
 
 
 And again examine the result:

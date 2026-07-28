@@ -7,6 +7,9 @@ Relate
 This page walks you through an example using mrpast's direct integration with
 `Relate <https://myersgroup.github.io/relate/index.html>`_.
 
+.. warning::
+  On the models we have tested, using ``mrpast`` with ``Relate`` was not as accurate as ``tsinfer+tsdate``. It may be worth comparing multiple ARG inference methods on your model(s).
+
 .. note::
   You don't have to use mrpast's ARG inference integrations: you can use
   anything that produces a `tskit tree-sequence <https://tskit.dev/learn/>`_. However we assume that ARGs we

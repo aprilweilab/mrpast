@@ -79,15 +79,15 @@ It also outputs a summary ``.csv`` file that can be used with ``mrpast show``:
   mrpast show solver_output.gim_summary.csv
 
 
-Model selection
-~~~~~~~~~~~~~~~
+Model comparison
+~~~~~~~~~~~~~~~~
 
 mrpast has an implementation of `Akaike Information Criterion <https://en.wikipedia.org/wiki/Akaike_information_criterion>`_ (AIC), which is
 based on the `composite likelihood-adjusted variation <https://academic.oup.com/biomet/article-abstract/92/3/519/218901>`_ of AIC.
 
 AIC can rank multiple possible models that have been evaluated on the same data. The lowest AIC score is the "selected model." We have found
 that often overly complex models (i.e., more complex than the model that generated the data) can sometimes be selected, or have an AIC score
-very close to the true model's. For these reasons, it is recommended to look at a distribution of the AIC scores over the set of bootstrap
+very close to the true model's. For these reasons, it is recommended to look at a **distribution** of the AIC scores over the set of bootstrap
 samples. mrpast contains a check to verify the bootstrap samples between two competing models are identical, because the data must be the same
 for a fair evaluation of the models. If the distributions of AIC values are indistinguishable, then the simpler model should be
 preferred.

@@ -110,7 +110,7 @@ Population Maps
 Each dataset has ``N`` individuals that are mapped to ``P`` populations. The example models provided with mrpast expect input data
 that has anywhere from 1 and 20 populations. Every population in the model that is "active" during the most recent time epoch needs
 to have associated individuals in the dataset. The population map is a JSON file that maps the individuals in the dataset to the
-populations in the model. The population names are provided in the population map, but it is the _order_ of populations between the
+populations in the model. The population names are provided in the population map, but it is the *order* of populations between the
 model and the map that associates them. The population map JSON looks like:
 
 ::
@@ -140,7 +140,7 @@ use the default number of time slices (20). Models with more than 2 epochs, or w
 when analyzing the OutOfAfrica_3G09 model we use either ``--num-times 200`` or ``--num-times 50L``. The former is just 200 time slices by
 assigning an approximately equal number of (panmictic) coalescences to each time slice. The latter is using 50 left-skewed time slices, which
 can improve accuracy for tsinfer and simulated ARGs (because there is higher resolution for more recent time). However, the left-skewed time
-slices do not work for all ARG inference methods, and Relate and SINGER often produce (obviously) poor results with left-skewed discretization.
+slices do not work for all scenarios; for example, Relate and SINGER ARGs often produce (obviously) poor results with left-skewed discretization.
 
 Theoretical Methods (GIM)
 -------------------------
@@ -177,7 +177,7 @@ that you want to use. A few examples are:
 1. You inferred an ARG containing 3 populations, but you want to use a model that only uses two of them. You could handle this by using the ``--leave-out`` option when calling ``mrpast process``, or you could downsample the ARG(s) first to remove the unneeded samples (see `tskit.TreeSequence.simplify() <https://tskit.dev/tskit/docs/stable/python-api.html#tskit.TreeSequence.simplify>`_), or you could reinfer the ARGs with only the relevant samples. Note that having these extra samples will affect ARG inference; whether this matters will depend on your use case.
 2. You inferred an ARG containing 4 populations, but you want to use a model that contains another (5th) population. Here, you need to treat one of these populations as unsampled and use the ``--map-pops`` option to specify how the ARG populations map to model populations.
 
-See the `examples <examples.html>`_ page for more details.
+See the `examples <../workflows/examples.html>`_ page for more details.
 
 Population Growth
 -----------------

@@ -13,7 +13,7 @@ The resulting installation has two parts:
 
   1. The ``mrpast`` command, used for the majority of mrpast's functionality. See ``mrpast --help``.
   2. The Python API, accessed via ``import mrpast``. This API is primarily used for plotting and
-     interpreting results from mrpast - see the `Python API reference <python_api.html>`_ for more
+     interpreting results from mrpast - see the `Python API reference <../reference/python_api.html>`_ for more
      details.
 
 On MacOS platforms or non-standard Linux platforms, the installation via ``pip`` may actually compile
@@ -26,11 +26,11 @@ when installing mrpast, since a lot of additional packages may be installed as w
 All default dependencies of mrpast will be installed automatically, but there is some optional functionality
 that you may need to install extra dependencies for:
 
-- The documentation section on `Relate <relate.html>`_ describes relevant installation steps.
-- The documentation section on `tsinfer <tsinfer.html>`_ describes relevant installation steps.
-- The documentation section on `SINGER <singer.html>`_ describes relevant installation steps.
+- The documentation section on `tsinfer <../workflows/tsinfer.html>`_ describes relevant installation steps.
 - Viewing of mrpast models and conversion to/from `Demes format <https://popsim-consortium.github.io/demes-spec-docs/main/introduction.html>`_ requires ``pip install demes networkx matplotlib``
 - Some of the examples in the documentation make use of `demesdraw <https://github.com/grahamgower/demesdraw>`_ which can be obtained via ``pip install demesdraw``
+- The documentation section on `Relate <../workflows/relate.html>`_ describes relevant installation steps.
+- The documentation section on `SINGER <../workflows/singer.html>`_ describes relevant installation steps.
 
 Advanced: Installing from source
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -41,9 +41,8 @@ Only developers should need to install from source.  Installing from source:
 
   git clone --recursive https://github.com/aprilweilab/mrpast.git
   cd mrpast
-  # Compiles C++, copies the binaries to the right directories, and install the Python code in
-  # an editable way (so changes are reflected immediately)
-  MRPAST_ENABLE_NATIVE=1 pip install -v -e .
+  # Compiles C++, copies the binaries to the right directories, and install the Python code
+  MRPAST_ENABLE_NATIVE=1 pip install -v .
 
 There are other environment variables that control the behavior of the mrpast build as well:
 
