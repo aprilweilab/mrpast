@@ -93,7 +93,8 @@ DEFAULT_RECOMB_RATE = 1e-8
 DEFAULT_SEQ_LENGTH = 100_000_000
 DEFAULT_SIM_REPLICATES = 20
 DEFAULT_SOLVE_REPS_PER_EPOCH = 10
-DEFAULT_TIME_SLICES = 20
+DEFAULT_TIME_SLICES = -1
+DEFAULT_TIME_SLICES_PER_EPOCH = 30
 DEFAULT_TREE_SAMPLE_RATE = 125_000
 # Everything up to the sample identifier is what we group by. I.e., this groups "across" all
 # samples for the same prefix (such as chromosome identifier). For example, if you run on
@@ -660,7 +661,10 @@ def process_ARGs(
                 group_id = m.group(1)
                 groups[group_id].append(fn)
         if unmatched and len(groups) > 0:
-            print(f"Some coal files matched --group-by regex, others did not.")
+            print(
+                f"Some coal files matched --group-by regex, others did not.",
+                file=sys.stderr,
+            )
             exit(1)
         if unmatched:
             print(f"WARNING: No matches for --group-by {group_by}", file=sys.stderr)
@@ -670,10 +674,19 @@ def process_ARGs(
         # a sampling strategy like bootstrap or jackknife.
         ts_list, ts_is_extra = time_slice_list(time_slice_str)
         if not ts_list or ts_is_extra:
+            if num_times == DEFAULT_TIME_SLICES:
+                num_times = (
+                    DEFAULT_TIME_SLICES_PER_EPOCH
+                    * UserModel.from_file(model).num_epochs
+                )
             time_slices = get_time_slices(
                 coal_filenames, num_times, max_generation, left_skewed=left_skew_times
             )
             time_slices = sorted(time_slices + ts_list)
+            print(
+                f"Requested {num_times + len(ts_list)} time slices, using {len(time_slices)+1}.",
+                file=sys.stderr,
+            )
         else:
             time_slices = ts_list
 
@@ -792,7 +805,8 @@ def main():
         "-t",
         type=suffixed_int,
         default=(DEFAULT_TIME_SLICES, None),
-        help=f"Number of time slices to use. Defaults to {DEFAULT_TIME_SLICES}. Use the suffix 'l' or 'L' to use left-skewed time slices.",
+        help=f"Number of time slices to use. Defaults to -1 (which calculates a value of {DEFAULT_TIME_SLICES_PER_EPOCH} per epoch)."
+        " Use the suffix 'l' or 'L' to use left-skewed time slices.",
     )
     process_parser.add_argument(
         "--solve",
