@@ -262,3 +262,33 @@ Typical usage is ``mrpast select ... > selection_results.json``, and then loadin
     options:
     -h, --help       show this help message and exit
     --bootstrap, -b  Emit the distribution of AIC values for all bootstrapped samples. Requires that you have previously run 'mrpast confidence --bootstrap' to produce a .csv for each of the solved_results.
+
+``mrpast pops``
+---------------
+
+Show the population information that is attached to an existing ARG(s):
+
+::
+
+    usage: mrpast pops show [-h] arg_prefix
+
+    positional arguments:
+    arg_prefix  The filename prefix for finding the input ARGs (.trees files)
+
+    options:
+    -h, --help  show this help message and exit
+
+Attach a `population map <../overview/concepts.html#population-maps>`_ to an existing ARG(s):
+
+::
+
+    usage: mrpast pops attach [-h] [--ploidy PLOIDY] arg_prefix out_prefix pop_map
+
+    positional arguments:
+    arg_prefix       The filename prefix for finding the input ARGs (.trees files)
+    out_prefix       The output prefix for writing the ARGs (now containing population info).
+    pop_map          The file containing the population map (*.popmap.json)
+
+    options:
+    -h, --help       show this help message and exit
+    --ploidy PLOIDY  The ploidy of individuals. Default: 2

@@ -117,8 +117,8 @@ model and the map that associates them. The population map JSON looks like:
 
   {
     "mapping": [
-      [ ... ],                       <-- list of individual indexes that are in the first population by model order
-      [ ... ],                       <-- list of individual indexes that are in the second population by model order
+      [ ... ],                       <-- list of individual indexes that are in the first population
+      [ ... ],                       <-- list of individual indexes that are in the second population
       ... 
     ],
     "names": [
