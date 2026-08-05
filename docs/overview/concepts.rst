@@ -117,8 +117,8 @@ model and the map that associates them. The population map JSON looks like:
 
   {
     "mapping": [
-      [ ... ],                       <-- list of individual indexes that are in the first population by model order
-      [ ... ],                       <-- list of individual indexes that are in the second population by model order
+      [ ... ],                       <-- list of individual indexes that are in the first population
+      [ ... ],                       <-- list of individual indexes that are in the second population
       ... 
     ],
     "names": [
@@ -167,6 +167,13 @@ Rate Maps
 For both simulation and inference, *mrpast* uses `msprime.RateMap <https://tskit.dev/msprime/docs/stable/rate_maps.html>`_-style recombination maps.
 The only place where this is not true is for ``mrpast arginfer --tool relate``, which requires `Relate's input format for rates <https://myersgroup.github.io/relate/input_data.html>`_.
 If you have rate maps downloaded in HapMap-style, you can convert them to what *mrpast* needs via `make_rate_map.py <https://github.com/aprilweilab/mrpast/blob/main/scripts/make_rate_map.py>`_.
+
+For recombination maps, mrpast can take either a single file (with a .txt extension) or a file prefix. When
+using a single file, it will use the same map for all chromosomes being processed. When using a file prefix,
+the number of files matching that prefix must match the number of chromosomes. And the recombination maps
+are paired up according to lexicographic order: so it is expected that each file has the same prefix and
+then a suffix like chr1, chr2, etc., (whatever matches the ordered names of your ARGs for those chromosomes)
+prior to the file extension.
 
 Model/ARG Population Mismatches
 -------------------------------

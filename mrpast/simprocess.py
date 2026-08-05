@@ -62,7 +62,12 @@ def update_coalescence_map(
         rate_map = load_rate_map(recomb_map_file)
 
     def sample_pop(sample_id: int, tree: tskit.Tree) -> int:
-        return tree.population(sample_id)
+        pop_idx = tree.population(sample_id)
+        if pop_idx < 0:
+            raise UserInputError(
+                "tskit ARG does not have sample->population information; try 'mrpast pops attach' or see https://mrpast.readthedocs.io/en/latest/workflows/custom.html"
+            )
+        return pop_idx
 
     # Recursively collect the vector [p_0, p_1, ..., p_k] where there are k populations in the
     # ARG, and p_i is the count of samples below the current node that are in population i.

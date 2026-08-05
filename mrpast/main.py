@@ -57,14 +57,16 @@ from mrpast.simulate import (
     build_demography,
 )
 from mrpast.arginfer import (
-    infer_arg,
     ArgTool,
-    DEFAULT_SAMPLE_SUFFIX,
     DEFAULT_NUM_SAMPLES as DEFAULT_ARG_SAMPLES,
+    DEFAULT_SAMPLE_SUFFIX,
+    attach_populations_ts,
+    infer_arg,
 )
 from mrpast.model import (
-    UserModel,
     ModelSolverInput,
+    PopMap,
+    UserModel,
     print_model_warnings,
 )
 from mrpast.simprocess import (
@@ -116,6 +118,7 @@ CMD_CONFIDENCE = "confidence"
 CMD_POLARIZE = "polarize"
 CMD_SHOW = "show"
 CMD_SELECT = "select"
+CMD_POPS = "pops"
 
 
 class BootstrapOpt(Enum):
@@ -257,13 +260,11 @@ def get_popsummary_from_args(
                     )
         assert all(map(lambda pstr: len(pstr) > 0, pop2names))
         pop2count = [0 for _ in pop2names]
-        for tree in ts.trees():
-            for i in ts.samples():
-                pop_id = tree.population(i)
-                if pop_id not in leave_out_pops:
-                    pop_id = pop_idx_map.get(pop_id, pop_id)
-                    pop2count[pop_id] += 1
-            break
+        for i in ts.samples():
+            pop_id = ts.node(i).population
+            if pop_id not in leave_out_pops:
+                pop_id = pop_idx_map.get(pop_id, pop_id)
+                pop2count[pop_id] += 1
         if not result:
             result.extend([(n, c) for n, c in zip(pop2names, pop2count)])
         else:
@@ -397,9 +398,14 @@ def get_coal_counts(
     deme_pair_index0 = model.get_pair_ordering()
     coal_matrices = []
     if number_of_groups > 1:
-        print(f"Using {number_of_groups} ARG sample with sampling method {description}")
+        print(
+            f"Using {number_of_groups} ARG samples with sampling method {description}",
+            file=sys.stderr,
+        )
         if bootstrap == BootstrapOpt.none:
+            sample_hashes = []
             for _, group_files in sorted(grouped_filenames.items(), key=lambda t: t[0]):
+                print(f"Sample is {group_files}", file=sys.stderr)
                 group_sampler = deepcopy(sampler)
                 sample_coal_matrices(
                     group_files,
@@ -412,11 +418,12 @@ def get_coal_counts(
                 )
                 assert len(group_sampler.coal_matrices) == 1
                 coal_matrices.append(group_sampler.coal_matrices[0])
+                sample_hashes.extend(group_sampler.sample_hashes())
         else:
             coal_files = []
             for group, grouped_files in grouped_filenames.items():
                 merged_file = f"{group}-avg-coal.txt"
-                print(f"Merging {grouped_files} -> {merged_file}")
+                print(f"Merging {grouped_files} -> {merged_file}", file=sys.stderr)
                 merge_coals(grouped_files, merged_file)
                 coal_files.append(merged_file)
             sample_coal_matrices(
@@ -429,6 +436,7 @@ def get_coal_counts(
                 pop_idx_map=pop_idx_map,
             )
             coal_matrices = list(sampler.coal_matrices)
+            sample_hashes = sampler.sample_hashes()
     else:
         print(f"Using a single ARG sample with sampling method {description}")
         coal_files = list(grouped_filenames.values())[0]
@@ -442,7 +450,8 @@ def get_coal_counts(
             pop_idx_map=pop_idx_map,
         )
         coal_matrices = list(sampler.coal_matrices)
-    return coal_matrices, description, sampler.sample_hashes()
+        sample_hashes = sampler.sample_hashes()
+    return coal_matrices, description, sample_hashes
 
 
 def generate_solver_input(
@@ -1136,6 +1145,35 @@ def main():
         "for each of the solved_results.",
     )
 
+    pops_parser = subparsers.add_parser(
+        CMD_POPS, help="Attach or view population maps for ARGs."
+    )
+    pops_sub = pops_parser.add_subparsers(dest="pops_cmd")
+    pop_attach = pops_sub.add_parser(
+        "attach", help="Attach a population map to one or more ARGs."
+    )
+    pop_attach.add_argument(
+        "arg_prefix",
+        help="The filename prefix for finding the input ARGs (.trees files)",
+    )
+    pop_attach.add_argument(
+        "out_prefix",
+        help="The output prefix for writing the ARGs (now containing population info).",
+    )
+    pop_attach.add_argument(
+        "pop_map", help="The file containing the population map (*.popmap.json)"
+    )
+    pop_attach.add_argument(
+        "--ploidy", default=2, type=int, help="The ploidy of individuals. Default: 2"
+    )
+    pop_show = pops_sub.add_parser(
+        "show", help="Show population info from one or more ARGs."
+    )
+    pop_show.add_argument(
+        "arg_prefix",
+        help="The filename prefix for finding the input ARGs (.trees files)",
+    )
+
     args = parser.parse_args()
 
     if args.command == CMD_SIMULATE:
@@ -1438,6 +1476,46 @@ def main():
         result = subprocess.check_output(cmd + args.solved_results).decode("utf-8")
         result = json.loads(result)
         print(json.dumps(result, indent=2))
+    elif args.command == CMD_POPS:
+        input_args = list(glob.glob(args.arg_prefix + "*.trees"))
+        print(f"Found {len(input_args)} input ARGs.", file=sys.stderr)
+
+        if args.pops_cmd == "show":
+            for in_arg in input_args:
+                ts = tskit.load(in_arg)
+                pop2names = [None] * ts.num_populations
+                for pop in ts.populations():
+                    pop2names[pop.id] = pop.metadata.get("name")
+                pop2count = [0 for _ in pop2names]
+                for i in ts.samples():
+                    pop_id = ts.node(i).population
+                    pop2count[pop_id] += 1
+                print(
+                    f"{in_arg} has populations {pop2names} with sample counts {pop2count}"
+                )
+
+        elif args.pops_cmd == "attach":
+            with open(args.pop_map) as f:
+                pop_map = PopMap.from_json(f.read())
+
+            for in_arg in input_args:
+                assert in_arg.startswith(args.arg_prefix)
+                suffix = in_arg[len(args.arg_prefix) :]
+                out_arg = args.out_prefix + suffix
+                if os.path.exists(out_arg):
+                    raise UserInputError(
+                        f"Output file {out_arg} already exists; remove and try again."
+                    )
+                ts = tskit.load(in_arg)
+                with_pops = attach_populations_ts(ts, pop_map, args.ploidy)
+                with_pops.dump(out_arg)
+                print(
+                    f"Wrote {out_arg} with {len(pop_map.mapping)} populations, "
+                    f"{sum([len(p) for p in pop_map.mapping])} samples, ploidy={args.ploidy}",
+                    file=sys.stderr,
+                )
+        else:
+            assert False, f"Invalid command: {args.pops_cmd}"
     else:
         parser.print_help()
         exit(1)
