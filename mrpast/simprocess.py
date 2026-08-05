@@ -65,7 +65,7 @@ def update_coalescence_map(
         pop_idx = tree.population(sample_id)
         if pop_idx < 0:
             raise UserInputError(
-                "tskit ARG does not have sample->population information; try 'mrpast pop-attach' or see https://mrpast.readthedocs.io/en/latest/workflows/custom.html"
+                "tskit ARG does not have sample->population information; try 'mrpast pops attach' or see https://mrpast.readthedocs.io/en/latest/workflows/custom.html"
             )
         return pop_idx
 

@@ -398,9 +398,14 @@ def get_coal_counts(
     deme_pair_index0 = model.get_pair_ordering()
     coal_matrices = []
     if number_of_groups > 1:
-        print(f"Using {number_of_groups} ARG sample with sampling method {description}")
+        print(
+            f"Using {number_of_groups} ARG samples with sampling method {description}",
+            file=sys.stderr,
+        )
         if bootstrap == BootstrapOpt.none:
+            sample_hashes = []
             for _, group_files in sorted(grouped_filenames.items(), key=lambda t: t[0]):
+                print(f"Sample is {group_files}", file=sys.stderr)
                 group_sampler = deepcopy(sampler)
                 sample_coal_matrices(
                     group_files,
@@ -413,11 +418,12 @@ def get_coal_counts(
                 )
                 assert len(group_sampler.coal_matrices) == 1
                 coal_matrices.append(group_sampler.coal_matrices[0])
+                sample_hashes.extend(group_sampler.sample_hashes())
         else:
             coal_files = []
             for group, grouped_files in grouped_filenames.items():
                 merged_file = f"{group}-avg-coal.txt"
-                print(f"Merging {grouped_files} -> {merged_file}")
+                print(f"Merging {grouped_files} -> {merged_file}", file=sys.stderr)
                 merge_coals(grouped_files, merged_file)
                 coal_files.append(merged_file)
             sample_coal_matrices(
@@ -430,6 +436,7 @@ def get_coal_counts(
                 pop_idx_map=pop_idx_map,
             )
             coal_matrices = list(sampler.coal_matrices)
+            sample_hashes = sampler.sample_hashes()
     else:
         print(f"Using a single ARG sample with sampling method {description}")
         coal_files = list(grouped_filenames.values())[0]
@@ -443,7 +450,8 @@ def get_coal_counts(
             pop_idx_map=pop_idx_map,
         )
         coal_matrices = list(sampler.coal_matrices)
-    return coal_matrices, description, sampler.sample_hashes()
+        sample_hashes = sampler.sample_hashes()
+    return coal_matrices, description, sample_hashes
 
 
 def generate_solver_input(
