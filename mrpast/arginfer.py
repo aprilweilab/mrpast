@@ -140,7 +140,8 @@ def tsinfer_run(
     inferred_ts = tsinfer.infer(vdata, recombination_rate=ratemap, num_threads=jobs)
 
     print("Running tsdate", file=sys.stderr)
-    simplified_ts = tsdate.preprocess_ts(inferred_ts)
+    # simplify() works around this bug (https://github.com/tskit-dev/tsdate/issues/497)
+    simplified_ts = tsdate.preprocess_ts(inferred_ts.simplify())
 
     redated_ts = tsdate.date(simplified_ts, mutation_rate=mut_rate)
 
