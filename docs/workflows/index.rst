@@ -5,6 +5,7 @@ Workflows
   :maxdepth: 2
 
   tsinfer workflows <tsinfer>
+  custom
   Examining results <results>
   Using real data <real_data>
   Very short examples <examples>
