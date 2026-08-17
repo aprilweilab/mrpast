@@ -3,6 +3,8 @@ Overview
 
 ``mrpast`` is a tool for inferring demographic parameters from Ancestral Recombination Graphs (created from phased genomic data).
 
+For an end-to-end example, see the `tsinfer workflow <../workflows/tsinfer.html>`_.
+
 Recommendations for use
 -----------------------
 

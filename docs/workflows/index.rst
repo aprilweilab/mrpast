@@ -1,6 +1,8 @@
 Workflows
 =========
 
+For an end-to-end example, see the `tsinfer workflow <tsinfer.html>`_.
+
 .. toctree::
   :maxdepth: 2
 

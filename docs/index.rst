@@ -11,6 +11,8 @@ You can either infer ARGs from your data yourself, or use one of mrpast's integr
 In our experience, ``mrpast`` obtains the best results with ``tsinfer+tsdate`` (the latter using the ``variational_gamma`` method).
 For some models, the results can be substantially better than when using other ARG inference tools.
 
+For an end-to-end example, see the `tsinfer workflow <workflows/tsinfer.html>`_.
+
 Use the links below or on the menu-bar to learn more.
 
 .. toctree::
