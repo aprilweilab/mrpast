@@ -637,7 +637,7 @@ def _demes_from_states(nstates: int) -> int:
     return int(math.sqrt(8 * nstates + 1) / 2 - 1 / 2)
 
 
-def _verify_timeslices(time_slice_lists: List[List[float]], labels: List[str]):
+def _verify_timeslices(time_slice_lists: List[numpy.typing.NDArray], labels: List[str]):
     """
     Print warnings if there are properties of the time slices that may cause artifacts when comparing
     the corresponding models/data.
@@ -761,13 +761,14 @@ def coal_dist_compare(
                     if do_cdf:
                         row_value = to_cdf(row_value)
                     for j in range(len(row_value)):
-                        row = {
-                            "ARGs": labels[i],
-                            "state": state,
-                            "time": out_times[i][j],
-                            "coals": row_value[j],
-                        }
-                        df_rows.append(row)
+                        df_rows.append(
+                            {
+                                "ARGs": labels[i],
+                                "state": state,
+                                "time": out_times[i][j],
+                                "coals": row_value[j],
+                            }
+                        )
     data = pandas.DataFrame.from_dict(df_rows)
 
     if plot is not None:
@@ -777,7 +778,9 @@ def coal_dist_compare(
         plt.rc("font", **{"size": 12})
         num_cols = 3
         num_rows = 2
-        f, axs = plt.subplots(num_rows, num_cols, figsize=(num_cols * 6, num_rows * 5))
+        fig, axs = plt.subplots(
+            num_rows, num_cols, figsize=(num_cols * 6, num_rows * 5)
+        )
 
         row = 0
         col = 0
@@ -827,10 +830,10 @@ def coal_dist_compare(
                     col = 0
                     row += 1
 
-        f.tight_layout()
-        f.subplots_adjust(hspace=0.25)
+        fig.tight_layout()
+        fig.subplots_adjust(hspace=0.25)
         if plot == "DISPLAY":
             pass
         else:
-            f.savefig(plot)
+            fig.savefig(plot)
     return data
