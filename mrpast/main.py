@@ -80,9 +80,10 @@ from mrpast.simprocess import (
     simulate_muts_and_export,
 )
 from mrpast.result import (
+    coal_dist_compare,
     load_json_pandas,
-    tab_show,
     summarize_bootstrap_data,
+    tab_show,
 )
 
 DEFAULT_INDIVIDUALS = 10  # per population
@@ -119,6 +120,7 @@ CMD_POLARIZE = "polarize"
 CMD_SHOW = "show"
 CMD_SELECT = "select"
 CMD_POPS = "pops"
+CMD_COALPLOT = "coalplot"
 
 
 class BootstrapOpt(Enum):
@@ -1119,7 +1121,9 @@ def main():
     )
 
     show_parser = subparsers.add_parser(CMD_SHOW, help="Show solver results.")
-    show_parser.add_argument("solved_result", help="A JSON file output by the solver.")
+    show_parser.add_argument(
+        "solved_result", nargs="+", help="One or more JSON files output by the solver."
+    )
     show_parser.add_argument(
         "--sort-by", "-s", default="Index", help="Sort parameters by the column name."
     )
@@ -1172,6 +1176,40 @@ def main():
     pop_show.add_argument(
         "arg_prefix",
         help="The filename prefix for finding the input ARGs (.trees files)",
+    )
+
+    coalplot_parser = subparsers.add_parser(
+        CMD_COALPLOT, help="Plot coalescence distributions of one or more JSON files."
+    )
+    coalplot_parser.add_argument(
+        "output_file",
+        type=str,
+        help="Filename for the output image. Passed directly to matplotlib.pyplot.savefig().",
+    )
+    coalplot_parser.add_argument(
+        "model",
+        type=str,
+        help="A mrpast model YAML file that can be used to get deme names.",
+    )
+    coalplot_parser.add_argument(
+        "result_jsons",
+        nargs="+",
+        help="One or more JSON files output by 'mrpast process' or 'mrpast solve'.",
+    )
+    coalplot_parser.add_argument(
+        "--pmf",
+        action="store_true",
+        help="Instead of plotting the CDF (default), plot the proportion of coalescences "
+        "that occur within each time slice as a line plot (PMF).",
+    )
+    coalplot_parser.add_argument(
+        "--labels",
+        nargs="+",
+        help="Label the input JSON files ",
+    )
+    coalplot_parser.add_argument(
+        "--keep-df",
+        help="Save the underlying pandas.DataFrame in the given filename.",
     )
 
     args = parser.parse_args()
@@ -1516,6 +1554,16 @@ def main():
                 )
         else:
             assert False, f"Invalid command: {args.pops_cmd}"
+    elif args.command == CMD_COALPLOT:
+        result_df = coal_dist_compare(
+            args.result_jsons,
+            args.model,
+            labels=args.labels,
+            do_cdf=not args.pmf,
+            plot=args.output_file,
+        )
+        if args.keep_df is not None:
+            result_df.to_csv(args.keep_df)
     else:
         parser.print_help()
         exit(1)

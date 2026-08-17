@@ -13,23 +13,32 @@
 #
 # You should have received a copy of the GNU General Public License
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
+from mrpast.model import UserModel
 from tabulate import tabulate
 from typing import Optional, Dict, Any, List, Iterable, Tuple
+import copy
 import itertools
 import json
 import math
 import mrpast.model
-import numpy as np
-import numpy as np
-import pandas as pd
+import numpy
+import os
+import pandas
+import sys
 
 try:
     import networkx as nx
-    import matplotlib.pyplot as plt
-    import matplotlib as mpl
 except ImportError:
     nx = None  # type: ignore
+
+try:
+    import matplotlib.pyplot as plt
+    import matplotlib as mpl
+    import seaborn as sns
+except ImportError:
     plt = None  # type: ignore
+    mpl = None  # type: ignore
+    sns = None  # type: ignore
 
 
 # b is within 0.1% of a
@@ -63,7 +72,7 @@ def _clamp(param, value):
 
 def load_json_pandas(
     filename: str, interval_field: Optional[str] = None, skip_fixed: bool = True
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """
     Load a solver output JSON file as a Pandas DataFrame.
 
@@ -240,15 +249,15 @@ def load_json_pandas(
             del p["one_minus"]
         result.append(p)
 
-    return pd.DataFrame.from_dict(result)
+    return pandas.DataFrame.from_dict(result)
 
 
 def summarize_bootstrap_data(
-    bootstrap_df: pd.DataFrame,
+    bootstrap_df: pandas.DataFrame,
     use_median: bool = True,
     interval_conf: float = 0.95,
     use_percentile: bool = False,
-) -> pd.DataFrame:
+) -> pandas.DataFrame:
     """
     Given a Pandas DataFrame loaded from a bootstrap CSV file, produce a new DataFrame
     that summarizes the data. Confidence intervals are calculated, and the resulting
@@ -288,11 +297,13 @@ def summarize_bootstrap_data(
     for label in set(bootstrap_df["label"]):
         truth = get_singular(bootstrap_df, label, "Ground Truth")
         values = bootstrap_df[bootstrap_df["label"] == label]["Optimized Value"]
-        median = np.median(values)
-        mean = np.average(values)
+        median = numpy.median(values)
+        mean = numpy.average(values)
         value = median if use_median else mean
         if use_percentile:
-            err_low, err_hi = np.percentile(values, [1 - interval_conf, interval_conf])
+            err_low, err_hi = numpy.percentile(
+                values, [1 - interval_conf, interval_conf]
+            )
             err_low = value - err_low
             err_hi = err_hi - value
             std_err = None
@@ -302,7 +313,7 @@ def summarize_bootstrap_data(
             std_err = None
         else:
             # numpy defaults to population stddev, so set degrees of freedom to 1
-            std_err = np.std(values, ddof=1)
+            std_err = numpy.std(values, ddof=1)
             err_low = max(0, (ci_mult * std_err))
             err_hi = max(0, (ci_mult * std_err))
         new_data.append(
@@ -330,7 +341,7 @@ def summarize_bootstrap_data(
             new_data[-1]["Lower Bound"] = get_singular(
                 bootstrap_df, label, "Lower Bound"
             )
-    return pd.DataFrame.from_dict(new_data).sort_values("label")
+    return pandas.DataFrame.from_dict(new_data).sort_values("label")
 
 
 def draw_graphs(
@@ -520,10 +531,11 @@ def get_matching_colors(num_demes, demes=[]):
     if demes:
         return {
             f"{demes[i]}": plt.cm.Dark2(c)
-            for i, c in enumerate(np.linspace(0, 1, num_demes))
+            for i, c in enumerate(numpy.linspace(0, 1, num_demes))
         }
     return {
-        f"pop_{i}": plt.cm.Dark2(c) for i, c in enumerate(np.linspace(0, 1, num_demes))
+        f"pop_{i}": plt.cm.Dark2(c)
+        for i, c in enumerate(numpy.linspace(0, 1, num_demes))
     }
 
 
@@ -616,3 +628,212 @@ def tab_show(
     print(f"Total relative error: {total_rel}")
 
     return total_rel
+
+
+# FIXME This is gross. Would be better to store the number of demes (and other model info)
+# in the JSON file directory.
+# nstates = D*(D+1) / 2, below is the positive root
+def _demes_from_states(nstates: int) -> int:
+    return int(math.sqrt(8 * nstates + 1) / 2 - 1 / 2)
+
+
+def _verify_timeslices(time_slice_lists: List[numpy.typing.NDArray], labels: List[str]):
+    """
+    Print warnings if there are properties of the time slices that may cause artifacts when comparing
+    the corresponding models/data.
+    """
+    mints = min(map(len, time_slice_lists))
+    maxts = max(map(len, time_slice_lists))
+    if mints != maxts:
+        print(
+            f"WARNING: Models are using different numbers of time slices. Min time slices={mints}, max={maxts}",
+            file=sys.stderr,
+        )
+
+    print("Median generations between time slices:", file=sys.stderr)
+    for l, ts_list in enumerate(time_slice_lists):
+        print(
+            f"  {labels[l]}: {numpy.median(ts_list[1:] - ts_list[:-1])}",
+            file=sys.stderr,
+        )
+    print("  A large discrepancy can affect the comparison plots.", file=sys.stderr)
+
+
+def coal_dist_compare(
+    result_files: List[str],
+    model: str,
+    labels: List[str] = [],
+    max_generation: int = 200_000,
+    do_cdf: bool = True,
+    plot: Optional[str] = "DISPLAY",
+) -> pandas.DataFrame:
+    """
+    Compare the pairwise coalescence distributions of the given mrpast JSON files. All inputs MUST have
+    the same number of demes! This method does not check the names of demes, just the count.
+
+    Note: the timeslices used by each result (coalescence matrix) may differ, which can make comparison
+    difficult. The ideal scenario is that all timeslice boundaries are the same. If this is not practical,
+    then there should at least be a large number of time slices (100+) to make all the curves smoother and
+    more comparable.
+
+    :param result_files: A list of filenames of mrpast solver inputs or solver outputs. Solver inputs and
+        outputs have the same file format, and only differ in whether there is output information like
+        the parameter inferred values. For this method, we only need the coalescence matrix which is present
+        in both input and output.
+    :type result_files: List[str]
+    :param model: The filename of the model to use for extracting deme information.
+    :type model: str
+    :param labels: Optional list of labels corresponding to each input filename. By default, the comparison
+        will just use the filename (basename), unless this list is provided. Empty list means just use the
+        default (filenames).
+    :type labels: List[str]
+    :param max_generation: The maximum number of generations to display. Default: 200,000.
+    :type max_generation: int
+    :param do_cdf: Plot the CDF of the coalescences. Default: True.
+    :type do_cdf: bool
+    :param plot: If special value "DISPLAY", then display the plot via IPython. If None, then do not attempt
+        to render a plot at all. Otherwise, the string value is a filename to write the figure to (using
+        matplotlib.pyplot.savefig()). Default: "DISPLAY".
+    :param plot: Optional[str]
+    """
+    out_matrices = []
+    out_times = []
+    all_epochs = []
+    for fn in result_files:
+        with open(fn) as f:
+            data = json.load(f)
+        out_matrices.append(data["coal_count_matrices"])
+        maxgen = max(data["time_slices_gen"][-1] + 1, max_generation)
+        out_times.append(numpy.array(data["time_slices_gen"] + [maxgen]))
+        all_epochs.extend([e["ground_truth"] for e in data["epoch_times_gen"]])
+    all_epochs = list(sorted(set(all_epochs)))
+    nstates = len(out_matrices[0][0])
+
+    user_model = UserModel.from_file(model)
+    ndemes = user_model.num_demes
+    assert _demes_from_states(nstates) == ndemes
+    deme_names = user_model.pop_names
+
+    if not labels:
+        labels = list(map(os.path.basename, result_files))
+    assert len(labels) == len(
+        result_files
+    ), "Number of labels does not match number of input files"
+    _verify_timeslices(out_times, labels)
+
+    deme_pair_map = {}
+    ct = 0
+    for i in range(ndemes):
+        for j in range(i, ndemes):
+            deme_pair_map[(i, j)] = ct
+            ct += 1
+    assert ct == len(out_matrices[0][0]), (ndemes, ct, len(out_matrices[0][0]))
+
+    def norm_row(row):
+        return numpy.array(row) / sum(row)
+
+    def norm_matrix(matrix):
+        sumv = 0
+        for row in matrix:
+            sumv += sum(row)
+        return numpy.array(matrix) / sumv
+
+    def double_norm(matrix):
+        new_matrix = [norm_row(r) for r in matrix]
+        return norm_matrix(new_matrix)
+
+    def to_cdf(row):
+        new_row = copy.copy(row)
+        for i in range(0, len(new_row)):
+            if i > 0:
+                new_row[i] += new_row[i - 1]
+        return new_row
+
+    df_rows = []
+    for d1 in range(ndemes):
+        for d2 in range(d1, ndemes):
+            state = deme_pair_map[d1, d2]
+
+            for i, matrix_list in enumerate(out_matrices):
+                for m in matrix_list:
+                    m = double_norm(m)
+                    row_value = m[state]
+                    if do_cdf:
+                        row_value = to_cdf(row_value)
+                    for j in range(len(row_value)):
+                        df_rows.append(
+                            {
+                                "ARGs": labels[i],
+                                "state": state,
+                                "time": out_times[i][j],
+                                "coals": row_value[j],
+                            }
+                        )
+    data = pandas.DataFrame.from_dict(df_rows)
+
+    if plot is not None:
+        assert (
+            plt is not None
+        ), "Plotting requires matplotlib and seaborn (pip install them)"
+        plt.rc("font", **{"size": 12})
+        num_cols = 3
+        num_rows = 2
+        fig, axs = plt.subplots(
+            num_rows, num_cols, figsize=(num_cols * 6, num_rows * 5)
+        )
+
+        row = 0
+        col = 0
+        for d1 in range(ndemes):
+            for d2 in range(d1, ndemes):
+                state = deme_pair_map[d1, d2]
+
+                data_subset = data[data["state"] == state]
+
+                if do_cdf:
+                    sns.scatterplot(
+                        data=data_subset,
+                        x="time",
+                        y="coals",
+                        hue="ARGs",
+                        ax=axs[row][col],
+                        lw=0,
+                        alpha=0.75,
+                    )
+                else:
+                    # The faded area is 95% confidence interval
+                    sns.lineplot(
+                        data=data_subset,
+                        x="time",
+                        y="coals",
+                        hue="ARGs",
+                        ax=axs[row][col],
+                        errorbar=("pi", 100),
+                    )
+                axs[row][col].set_xlabel("Time (Generations)")
+                axs[row][col].set_ylabel("Normalized coalescences")
+                if d1 == d2:
+                    axs[row][col].set_title(f"Within {deme_names[d1]}")
+                else:
+                    axs[row][col].set_title(f"Across {deme_names[d1]},{deme_names[d2]}")
+                axs[row][col].set_xscale("log")
+                if col > 0:
+                    axs[row][col].set_ylabel(None)
+                if row == 0:
+                    axs[row][col].set_xlabel(None)
+                if (row, col) != (0, 0):
+                    axs[row][col].get_legend().remove()
+                axs[row][col].set_yticks([])
+
+                col += 1
+                if col >= num_cols:
+                    col = 0
+                    row += 1
+
+        fig.tight_layout()
+        fig.subplots_adjust(hspace=0.25)
+        if plot == "DISPLAY":
+            pass
+        else:
+            fig.savefig(plot)
+    return data

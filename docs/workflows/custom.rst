@@ -84,4 +84,4 @@ You can attach population information to your ARGs in a few ways.
 1. You can write your own script(s). See `attach_populations_ts() <https://github.com/aprilweilab/mrpast/blob/main/mrpast/arginfer.py>`_ for an example of how to do this. The main requirements are that (a) every sample should be assigned to a population, and (b) the `population metadata <https://tskit.dev/tskit/docs/stable/python-api.html#tskit.Population.metadata>`_ should have a ``name`` field.
 2. You can create a mrpast-style ``.popmap.json`` file (see `here <../overview/concepts.html#population-maps>`_) and use the ``mrpast pops attach`` command.
 
-``mrpast pops view <args prefix>`` can be used to view the population information in a set of ARGs.
+``mrpast pops show <args prefix>`` can be used to show the population information in a set of ARGs.

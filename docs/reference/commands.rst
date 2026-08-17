@@ -292,3 +292,27 @@ Attach a `population map <../overview/concepts.html#population-maps>`_ to an exi
     options:
     -h, --help       show this help message and exit
     --ploidy PLOIDY  The ploidy of individuals. Default: 2
+
+``mrpast coalplot``
+-------------------
+
+Plot the coalescence distributions of closely related models/datasets. For example, plot simulated data against inferred
+data. The model underlying the comparison does not have to be the same for all data, but the demes represented by those
+models must be the same.
+
+::
+
+    usage: mrpast coalplot [-h] [--pmf] [--labels LABELS [LABELS ...]] [--keep-df KEEP_DF] output_file model result_jsons [result_jsons ...]
+
+    positional arguments:
+    output_file           Filename for the output image. Passed directly to matplotlib.pyplot.savefig().
+    model                 A mrpast model YAML file that can be used to get deme names.
+    result_jsons          One or more JSON files output by 'mrpast process' or 'mrpast solve'.
+
+    options:
+    -h, --help            show this help message and exit
+    --pmf                 Instead of plotting the CDF (default), plot the proportion of coalescences that occur within each time slice as a line plot (PMF).
+    --labels LABELS [LABELS ...]
+                            Label the input JSON files
+    --keep-df KEEP_DF     Save the underlying pandas.DataFrame in the given filename.
+
