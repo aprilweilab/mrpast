@@ -16,7 +16,6 @@
 from mrpast.model import UserModel
 from tabulate import tabulate
 from typing import Optional, Dict, Any, List, Iterable, Tuple
-import copy
 import itertools
 import json
 import math
@@ -729,37 +728,29 @@ def coal_dist_compare(
             ct += 1
     assert ct == len(out_matrices[0][0]), (ndemes, ct, len(out_matrices[0][0]))
 
+    # Each row represents all the coalescences that started in a given state (e.g., state=[pop1, pop2])
+    # We normalize this to be akin to the probability distribution that we coalesce in time slice K
+    # given that the lineage pair started in "state".
     def norm_row(row):
         return numpy.array(row) / sum(row)
 
-    def norm_matrix(matrix):
-        sumv = 0
-        for row in matrix:
-            sumv += sum(row)
-        return numpy.array(matrix) / sumv
-
-    def double_norm(matrix):
+    def norm_all_rows(matrix):
         new_matrix = [norm_row(r) for r in matrix]
-        return norm_matrix(new_matrix)
-
-    def to_cdf(row):
-        new_row = copy.copy(row)
-        for i in range(0, len(new_row)):
-            if i > 0:
-                new_row[i] += new_row[i - 1]
-        return new_row
+        return numpy.array(new_matrix)
 
     df_rows = []
     for d1 in range(ndemes):
         for d2 in range(d1, ndemes):
             state = deme_pair_map[d1, d2]
 
+            # We process each coalescence matrix in turn; there are multiple of these
+            # when trees were bootstrapped, for example.
             for i, matrix_list in enumerate(out_matrices):
                 for m in matrix_list:
-                    m = double_norm(m)
+                    m = norm_all_rows(m)
                     row_value = m[state]
                     if do_cdf:
-                        row_value = to_cdf(row_value)
+                        row_value = numpy.cumsum(row_value)
                     for j in range(len(row_value)):
                         df_rows.append(
                             {
@@ -798,6 +789,7 @@ def coal_dist_compare(
                         hue="ARGs",
                         ax=axs[row][col],
                         lw=0,
+                        s=10,
                         alpha=0.75,
                     )
                 else:
@@ -823,7 +815,6 @@ def coal_dist_compare(
                     axs[row][col].set_xlabel(None)
                 if (row, col) != (0, 0):
                     axs[row][col].get_legend().remove()
-                axs[row][col].set_yticks([])
 
                 col += 1
                 if col >= num_cols:
