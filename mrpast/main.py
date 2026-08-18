@@ -1122,7 +1122,7 @@ def main():
 
     show_parser = subparsers.add_parser(CMD_SHOW, help="Show solver results.")
     show_parser.add_argument(
-        "solved_result", nargs="+", help="One or more JSON files output by the solver."
+        "solved_result", help="One or more JSON files output by the solver."
     )
     show_parser.add_argument(
         "--sort-by", "-s", default="Index", help="Sort parameters by the column name."
