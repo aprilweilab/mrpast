@@ -665,6 +665,7 @@ def coal_dist_compare(
     max_generation: int = 200_000,
     do_cdf: bool = True,
     plot: Optional[str] = "DISPLAY",
+    save_kwargs: Dict[str, Any] = {},
 ) -> pandas.DataFrame:
     """
     Compare the pairwise coalescence distributions of the given mrpast JSON files. All inputs MUST have
@@ -694,6 +695,8 @@ def coal_dist_compare(
         to render a plot at all. Otherwise, the string value is a filename to write the figure to (using
         matplotlib.pyplot.savefig()). Default: "DISPLAY".
     :param plot: Optional[str]
+    :param save_kwargs: Keyword arguments to pass to matplotlib.pyplot.savefig().
+    :type save_kwargs: Dict[str, Any]
     """
     out_matrices = []
     out_times = []
@@ -720,6 +723,7 @@ def coal_dist_compare(
     ), "Number of labels does not match number of input files"
     _verify_timeslices(out_times, labels)
 
+    # Map a pair of deme indices to the Markov chain state
     deme_pair_map = {}
     ct = 0
     for i in range(ndemes):
@@ -732,12 +736,16 @@ def coal_dist_compare(
     # We normalize this to be akin to the probability distribution that we coalesce in time slice K
     # given that the lineage pair started in "state".
     def norm_row(row):
-        return numpy.array(row) / sum(row)
+        n = sum(row)
+        if n == 0:
+            return row
+        return numpy.array(row) / n
 
     def norm_all_rows(matrix):
         new_matrix = [norm_row(r) for r in matrix]
         return numpy.array(new_matrix)
 
+    plot_demes = set()
     df_rows = []
     for d1 in range(ndemes):
         for d2 in range(d1, ndemes):
@@ -749,6 +757,10 @@ def coal_dist_compare(
                 for m in matrix_list:
                     m = norm_all_rows(m)
                     row_value = m[state]
+                    # We only plot deme pairs if they have at least one non-zero row. Deme pairs with only
+                    # zeros correspond to unsampled/ancestral populations.
+                    if numpy.sum(row_value) > 0:
+                        plot_demes.add((d1, d2))
                     if do_cdf:
                         row_value = numpy.cumsum(row_value)
                     for j in range(len(row_value)):
@@ -768,63 +780,61 @@ def coal_dist_compare(
         ), "Plotting requires matplotlib and seaborn (pip install them)"
         plt.rc("font", **{"size": 12})
         num_cols = 3
-        num_rows = 2
+        num_rows = len(plot_demes) // num_cols
         fig, axs = plt.subplots(
             num_rows, num_cols, figsize=(num_cols * 6, num_rows * 5)
         )
 
         row = 0
         col = 0
-        for d1 in range(ndemes):
-            for d2 in range(d1, ndemes):
-                state = deme_pair_map[d1, d2]
+        for d1, d2 in sorted(plot_demes):
+            state = deme_pair_map[d1, d2]
+            data_subset = data[data["state"] == state]
 
-                data_subset = data[data["state"] == state]
+            if do_cdf:
+                sns.scatterplot(
+                    data=data_subset,
+                    x="time",
+                    y="coals",
+                    hue="ARGs",
+                    ax=axs[row][col],
+                    lw=0,
+                    s=10,
+                    alpha=0.75,
+                )
+            else:
+                # The faded area is 95% confidence interval
+                sns.lineplot(
+                    data=data_subset,
+                    x="time",
+                    y="coals",
+                    hue="ARGs",
+                    ax=axs[row][col],
+                    errorbar=("pi", 100),
+                )
+            axs[row][col].set_xlabel("Time (Generations)")
+            axs[row][col].set_ylabel("Normalized coalescences")
+            if d1 == d2:
+                axs[row][col].set_title(f"Within {deme_names[d1]}")
+            else:
+                axs[row][col].set_title(f"Across {deme_names[d1]},{deme_names[d2]}")
+            axs[row][col].set_xscale("log")
+            if col > 0:
+                axs[row][col].set_ylabel(None)
+            if row == 0:
+                axs[row][col].set_xlabel(None)
+            if (row, col) != (0, 0):
+                axs[row][col].get_legend().remove()
 
-                if do_cdf:
-                    sns.scatterplot(
-                        data=data_subset,
-                        x="time",
-                        y="coals",
-                        hue="ARGs",
-                        ax=axs[row][col],
-                        lw=0,
-                        s=10,
-                        alpha=0.75,
-                    )
-                else:
-                    # The faded area is 95% confidence interval
-                    sns.lineplot(
-                        data=data_subset,
-                        x="time",
-                        y="coals",
-                        hue="ARGs",
-                        ax=axs[row][col],
-                        errorbar=("pi", 100),
-                    )
-                axs[row][col].set_xlabel("Time (Generations)")
-                axs[row][col].set_ylabel("Normalized coalescences")
-                if d1 == d2:
-                    axs[row][col].set_title(f"Within {deme_names[d1]}")
-                else:
-                    axs[row][col].set_title(f"Across {deme_names[d1]},{deme_names[d2]}")
-                axs[row][col].set_xscale("log")
-                if col > 0:
-                    axs[row][col].set_ylabel(None)
-                if row == 0:
-                    axs[row][col].set_xlabel(None)
-                if (row, col) != (0, 0):
-                    axs[row][col].get_legend().remove()
-
-                col += 1
-                if col >= num_cols:
-                    col = 0
-                    row += 1
+            col += 1
+            if col >= num_cols:
+                col = 0
+                row += 1
 
         fig.tight_layout()
         fig.subplots_adjust(hspace=0.25)
         if plot == "DISPLAY":
             pass
         else:
-            fig.savefig(plot)
+            fig.savefig(plot, **save_kwargs)
     return data
