@@ -1,6 +1,9 @@
 ![](https://github.com/aprilweilab/mrpast/actions/workflows/python-package.yml/badge.svg)
 
 [![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/mrpast/README.html)
+<p align="center">
+<img width="150" height="110" alt="mrpast_sw" src="https://github.com/user-attachments/assets/2cc4d844-faf1-41eb-8075-c83e02eac49f" />
+</p>
 
 # mrpast
 
