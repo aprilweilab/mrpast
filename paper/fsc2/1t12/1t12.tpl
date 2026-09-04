@@ -10,8 +10,8 @@ GNRATE
 0 
 //historical event: time, source, sink, migrants, new size, new growth rate, migr. matrix  
 2 historical event  
-T1 0 0 0 REL1 0 0  
-T2 0 0 0 REL2 0 0  
+T1 0 0 0 1 0 0
+T2 0 0 0 N2 0 0 absoluteResize
 //Number of independent loci [chromosome]  
 1 0  
 //Per chromosome: Number of linkage blocks  
