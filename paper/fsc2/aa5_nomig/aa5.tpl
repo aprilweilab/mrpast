@@ -7,11 +7,11 @@ ASIA_N0
 NAT_N0
 ADMIX_N0
 //Sample sizes  
-200
-200
-200
-200
-200
+100
+100
+100
+100
+100
 //Growth rates : negative growth implies population expansion  
 0
 0 
@@ -24,11 +24,11 @@ ADMIX_N0
 9 historical event  
 T1 4 0 AM1 1 0 0
 T1 4 1 AMPAR2 1 EUR_NG 0
-T1 2 2 0 ASIA_N1 ASIA_NG 0
+T1 2 2 0 1 ASIA_NG 0
 T1 4 3 1 1 0 0
-T2 1 1 0 EUR_N1 0 0
-T2 3 2 1 ASIA_N1 0 0
-T3 2 1 1 EUR_N2 0 0
+T2 1 1 0 EUR_ABS_N1 0 0 absoluteResize
+T2 3 2 1 ASIA_ABS_N1 0 0 absoluteResize
+T3 2 1 1 EUR_ABS_N2 0 0 absoluteResize
 T4 1 0 1 1 0 0  
 T5 0 0 0 AFR_N1 0 0  
 //Number of independent loci [chromosome]  
