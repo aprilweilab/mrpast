@@ -618,6 +618,7 @@ def process_ARGs(
     seed: int = DEFAULT_RANDOM_SEED,
     pop_idx_map: Dict[int, int] = {},
     solver_timeout: Optional[float] = None,
+    coal_filenames: Optional[List[str]] = None,
 ) -> List[str]:
     """
     Given a set of ARGs, extract the pair-wise coalescence information and turn it into a concrete
@@ -643,18 +644,21 @@ def process_ARGs(
             )
         # Step 1: collect coalescence distributions from the ARG, or load it from a previously
         # generated JSON file.
-        coal_filenames = get_coaldist_from_arg(
-            coal_dir,
-            arg_prefix,
-            jobs=jobs,
-            leave_out_pops=leave_out,
-            min_time_unit=min_time_unit,
-            tree_sample_rate=tree_sample_rate,
-            rate_maps=rate_maps,
-            rate_map_threshold=rate_map_threshold,
-        )
-        if verbose:
-            print(f"Wrote coalescences to {coal_filenames}")
+        if coal_filenames is None:
+            coal_filenames = get_coaldist_from_arg(
+                coal_dir,
+                arg_prefix,
+                jobs=jobs,
+                leave_out_pops=leave_out,
+                min_time_unit=min_time_unit,
+                tree_sample_rate=tree_sample_rate,
+                rate_maps=rate_maps,
+                rate_map_threshold=rate_map_threshold,
+            )
+            if verbose:
+                print(f"Wrote coalescences to {coal_filenames}")
+        elif verbose:
+            print(f"Reading coalescences from {coal_filenames}")
 
         unmatched = []
         groups = defaultdict(list)
@@ -916,6 +920,11 @@ def main():
         default=None,
         type=float,
         help="Solver timeout in seconds. Solver returns the current best result upon timeout.",
+    )
+    process_parser.add_argument(
+        "--existing-coals",
+        default=None,
+        help="Use the filenames matching the given prefix for per-locus coalescence counts (must have .txt extension).",
     )
 
     solve_parser = subparsers.add_parser(
@@ -1245,6 +1254,14 @@ def main():
 
         leave_out = parse_intlist(args.leave_out)
 
+        existing_coalfiles = None
+        if args.existing_coals is not None:
+            the_glob = f"{args.existing_coals}*.txt"
+            existing_coalfiles = list(sorted(map(os.path.abspath, glob.glob(the_glob))))
+            assert (
+                len(existing_coalfiles) > 0
+            ), f"Found no coalescence files matching '{the_glob}'"
+
         random.seed(args.seed)
         try:
             process_ARGs(
@@ -1272,6 +1289,7 @@ def main():
                 seed=args.seed,
                 pop_idx_map=pop_idx_map,
                 solver_timeout=args.timeout,
+                coal_filenames=existing_coalfiles,
             )
         except UserInputError as e:
             print("", file=sys.stderr)
