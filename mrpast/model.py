@@ -503,6 +503,7 @@ class UserModel:
         ), f"Growth entries reference an epoch {self.growth.max_epoch} that exceeds number of populations {nepoch}"
 
         # Admixture constraints
+        deme_pairs = defaultdict(set)
         types_seen = defaultdict(set)
         admix_by_deme_epoch = defaultdict(int)
         for entry in self.admixture.entries:
@@ -512,14 +513,15 @@ class UserModel:
             assert (
                 entry.epoch > 0
             ), "Admixture cannot be defined for epoch 0; admixture occurs at the end (most recent time) of an epoch"
+            assert (entry.ancestral, entry.derived) not in deme_pairs[
+                entry.epoch
+            ], f"Saw admixture pair ({self.pop_names[entry.ancestral]}, {self.pop_names[entry.derived]}) twice in epoch {entry.epoch}"
+            deme_pairs[entry.epoch].add((entry.ancestral, entry.derived))
             if isinstance(entry.proportion, ParamRef):
                 types_seen[entry.epoch].add("param")
                 param = self.admixture.get_parameter(entry.proportion.param)
                 admix_by_deme_epoch[(entry.derived, entry.epoch)] += param.ground_truth
             else:
-                assert isinstance(entry.proportion, float) or isinstance(
-                    entry.proportion, int
-                )
                 types_seen[entry.epoch].add("const")
                 admix_by_deme_epoch[(entry.derived, entry.epoch)] += entry.proportion
         for epoch, typ in types_seen.items():
@@ -533,6 +535,7 @@ class UserModel:
             ), f"Admixtures values or ground_truth must sum to 1 (epoch {epoch}, deme={deme})"
 
         def _validate_value(v, name, supports_previous=False):
+            err_msg = f"{name}: ParamRef's ground_truth, ub, and lb must all be between 0...1; constant values must also be 0...1 (saw: {v})"
             supported_set = set()
             if supports_previous:
                 supported_set.add(STRING_COPY_PREVIOUS)
@@ -541,13 +544,24 @@ class UserModel:
                     raise RuntimeError(
                         f"String value '{v}' not supported for {name} entries"
                     )
-            else:
+            elif isinstance(v, ParamRef):
+                param = getattr(self, name).get_parameter(v.param)
+                assert param.ground_truth >= 0 and param.ground_truth <= 1.0, err_msg
+                assert param.lb >= 0 and param.lb <= 1.0, err_msg
+                assert param.ub >= 0 and param.ub <= 1.0, err_msg
                 assert (
-                    isinstance(v, float)
-                    or isinstance(v, int)
-                    or isinstance(v, ParamRef)
+                    param.ground_truth >= param.lb and param.ground_truth <= param.ub
+                ), f"{name}: ground_truth must be between lower/upper bounds ({v})"
+            else:
+                assert isinstance(v, float) or isinstance(
+                    v, int
                 ), f"Invalid value for {name}: {v}"
+                assert v >= 0 and v <= 1.0, err_msg
 
+        deme_epochs = [(e.epoch, e.deme) for e in self.coalescence.entries]
+        assert len(set(deme_epochs)) == len(
+            deme_epochs
+        ), "coalescence: Only one entry allowed per deme, per epoch"
         list(
             map(
                 lambda e: _validate_value(
@@ -556,10 +570,21 @@ class UserModel:
                 self.coalescence.entries,
             )
         )
+
+        deme_epochs = [(e.epoch, e.deme) for e in self.growth.entries]
+        assert len(set(deme_epochs)) == len(
+            deme_epochs
+        ), "growth: Only one entry allowed per deme, per epoch"
         list(map(lambda e: _validate_value(e.rate, "growth"), self.growth.entries))
+
+        deme_epochs = [(e.epoch, e.source, e.dest) for e in self.migration.entries]
+        assert len(set(deme_epochs)) == len(
+            deme_epochs
+        ), "migration: Only one entry allowed per deme-pair, per epoch"
         list(
             map(lambda e: _validate_value(e.rate, "migration"), self.migration.entries)
         )
+
         list(
             map(
                 lambda e: _validate_value(e.proportion, "admixture"),
