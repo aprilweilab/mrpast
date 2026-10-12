@@ -5,7 +5,7 @@
 # Various populations can be used for the ADMIX deme, and the ground-truth
 # values that we use here are inferred from the PUR population. Note that
 # the ADMIX population's Ne ground truth is just Ne=10,000 because we cannot
-# infer that with MrPast when NAT is treated as a ghost.
+# infer that with MrPast when NAT is unsampled.
 ploidy: 2
 pop_names:
 - AFR
