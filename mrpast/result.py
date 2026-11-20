@@ -222,7 +222,10 @@ def load_json_pandas(
         v = _clamp(p, p["final"])
         del p["apply_to"]
         is_fixed = _param_is_fixed(p)
-        if is_fixed and skip_fixed:
+        # FIXME the admixture matrix ends up _always_ adding a constant "1" value, even when the model
+        # contains no admixture. This constant has a kind_index = -1, so we skip it. This whole schema
+        # needs to get cleaned up and formalized so we can avoid nasty stuff like this.
+        if (is_fixed and skip_fixed) or p.get("kind_index", 0) < 0:
             continue
         truth = _clamp(p, p["ground_truth"]) if not is_fixed else p["init"]
         err_low = v - _clamp(p, get_interval(p, 0))
